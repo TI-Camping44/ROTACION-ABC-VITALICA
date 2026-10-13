@@ -187,8 +187,14 @@ const STK = Object.freeze({
      tramos: "Proteína / VITALICA" coincide con ALL / Proteína / VITALICA y no
      con cualquier otra categoría que se llame VITALICA. */
   FAMILIAS_UNIFICADAS: Object.freeze([
-    { familia: 'Proteínas', categorias: ['Suplementos (Padre) / Proteínas', 'Proteína', 'Proteína / VITALICA'] },
+    { familia: 'Proteínas', linea: 'Suplementos',
+      categorias: ['Suplementos (Padre) / Proteínas', 'Proteína', 'Proteína / VITALICA'] },
   ]),
+
+  /* LÍNEA: el nivel de arriba de la familia en el árbol de Odoo. Para
+     ALL / Suplementos (Padre) / Creatinas es "Suplementos" (sin "(Padre)").
+     Las familias que cuelgan directo de ALL van a LINEA_DEFECTO. */
+  LINEA_DEFECTO: 'Otros productos',
 
   /* Productos que quedan fuera del reporte, por referencia interna. */
   PRODUCTOS_EXCLUIDOS: Object.freeze([]),
@@ -453,11 +459,12 @@ function stkDiagnosticar() {
         c.property_cost_method || 'sin definir',
         c.property_valuation === 'real_time' ? 'automática' : 'MANUAL',
         stkExcluida_(ruta) ? 'excluida del reporte' : stkFamilia_(ruta),
+        stkExcluida_(ruta) ? '' : stkLinea_(ruta),
       ];
     })
     .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'es'));
   stkEscribir_('DIAGNOSTICO CATEGORIAS',
-    ['Categoría', 'Método de costo', 'Valoración', 'Familia en el reporte'],
+    ['Categoría', 'Método de costo', 'Valoración', 'Familia en el reporte', 'Línea'],
     detalle, []);
 
   const metaProd = stkCamposDe_(sesion, 'product.template');
@@ -1171,7 +1178,13 @@ function stkActualizarDatos() {
       ROT_DEP: rotDep.filas.map(r => [r[0], r[1], r[2], r[3], r[4], q2(r[5]), aM(r[6]),
                                       q2(r[7]), aM(r[8]), r[9].map(q2), r[10]]),
       SERIES_FAM: {}, CMV6_FAM: {}, SERIES_ART: {}, ROT_ART: [],
+      /* Familia -> línea, para agrupar en el reporte. */
+      LINEAS: {},
     };
+    Object.keys(productos.porPlantilla).forEach(id => {
+      const p = productos.porPlantilla[id];
+      D.LINEAS[p.familia] = p.linea;
+    });
     hist.filasArt.forEach(fila => { D.SERIES_ART[fila[0]] = fila.slice(1).map(aM); });
     hist.filasFam.forEach(fila => { D.SERIES_FAM[fila[0]] = fila.slice(1).map(aM); });
     Object.keys(salidas.cmvFam).forEach(x => { D.CMV6_FAM[x] = aM(salidas.cmvFam[x]); });
@@ -1281,6 +1294,7 @@ function stkProductos_(sesion, empresa) {
       /* Familia: la hoja del árbol de categorías de Odoo (ALL / Suplementos
          (Padre) / <familia> o ALL / <familia>), salvo las unificadas. */
       familia: stkFamilia_(categoriaProducto),
+      linea: stkLinea_(categoriaProducto),
       abc: stkVisible_(meta[STK.CAMPO_ABC], t[STK.CAMPO_ABC]),
       costo: stkNum_(t.standard_price),
     };
@@ -1332,6 +1346,13 @@ function stkHojaCategoria_(rutaCompleta) {
  * si la ruta termina en alguna de las configuradas, y si no, la última hoja.
  */
 function stkFamilia_(rutaCompleta) {
+  const regla = stkReglaFamilia_(rutaCompleta);
+  if (regla) return regla.familia;
+  return stkLimpiar_(stkHojaCategoria_(rutaCompleta)) || 'Sin familia';
+}
+
+/** La regla de STK.FAMILIAS_UNIFICADAS que corresponde a la ruta, si hay. */
+function stkReglaFamilia_(rutaCompleta) {
   const tramos = String(rutaCompleta || '').split('/').map(stkNorm_);
   for (let i = 0; i < STK.FAMILIAS_UNIFICADAS.length; i++) {
     const regla = STK.FAMILIAS_UNIFICADAS[i];
@@ -1341,9 +1362,22 @@ function stkFamilia_(rutaCompleta) {
       const cola = tramos.slice(tramos.length - buscados.length);
       return buscados.every((t, j) => t === cola[j]);
     });
-    if (coincide) return regla.familia;
+    if (coincide) return regla;
   }
-  return stkLimpiar_(stkHojaCategoria_(rutaCompleta)) || 'Sin familia';
+  return null;
+}
+
+/**
+ * Línea de una categoría: el tramo del árbol justo arriba de la familia,
+ * sin la raíz ALL y sin el "(Padre)" con que Odoo marca las categorías madre.
+ */
+function stkLinea_(rutaCompleta) {
+  const regla = stkReglaFamilia_(rutaCompleta);
+  if (regla && regla.linea) return regla.linea;
+  const tramos = String(rutaCompleta || '').split('/').map(t => stkLimpiar_(t));
+  const padre = tramos.length >= 2 ? tramos[tramos.length - 2] : '';
+  if (!padre || stkNorm_(padre) === 'ALL') return STK.LINEA_DEFECTO;
+  return padre.replace(/\s*\(padre\)\s*$/i, '').trim() || STK.LINEA_DEFECTO;
 }
 
 /** Referencias apartadas del reporte por decisión, no por categoría. */

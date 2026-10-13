@@ -398,6 +398,7 @@ td.nom{min-width:200px}
     <div class="filters">
       <select id="f-grp" aria-label="Grupo de depósitos"></select>
       <select id="f-dep" aria-label="Depósito"></select>
+      <select id="f-lin" aria-label="Línea"></select>
       <select id="f-fam" aria-label="Familia"></select>
       <select id="f-cat" aria-label="Categoría"></select>
     </div>
@@ -623,6 +624,15 @@ var estadoActivo = "*";
 
 var esNoComercial = function(d){ return NO_COMERCIAL.indexOf(d) >= 0; };
 var esMuestrario = function(d){ return MUESTRARIO.indexOf(d) >= 0; };
+/* Línea de cada familia: el nivel de arriba en el árbol de categorías de
+   Odoo (Suplementos, Otros productos). Un datos.js anterior no la trae y
+   todo queda en una sola línea, sin agrupar. */
+var LINEAS = DATOS.LINEAS || {};
+var lineaDe = function(fam){ return LINEAS[fam] || ""; };
+var hayLineas = function(){
+  var s = {}; Object.keys(LINEAS).forEach(function(k){ s[LINEAS[k]] = true; });
+  return Object.keys(s).length > 1;
+};
 var esAbast = function(d){ return ABASTECIMIENTO.indexOf(d) >= 0; };
 var grupoDe = function(d){ return (DEPOS[d] && DEPOS[d].grupo) || "Otros"; };
 var codDe = function(d){ return (DEPOS[d] && DEPOS[d].cod) || ""; };
@@ -692,7 +702,7 @@ function textoCob(qs, qv){
 }
 
 /* ---------------- estado de filtros ---------------- */
-var NADA = function(){ return { grp:"*", dep:"*", fam:"*", cat:"*" }; };
+var NADA = function(){ return { grp:"*", dep:"*", lin:"*", fam:"*", cat:"*" }; };
 var f = NADA();
 var serieActiva = null;
 var orden_filtros = [];
@@ -724,12 +734,16 @@ var per = { desde: 0, hasta: MESES.length - 1 };
 var pasaDep = function(d){
   return (f.grp === "*" || grupoDe(d) === f.grp) && (f.dep === "*" || d === f.dep);
 };
+/** La familia pasa el filtro de familia y el de línea. */
+var pasaFam = function(fam){
+  return (f.fam === "*" || fam === f.fam) && (f.lin === "*" || lineaDe(fam) === f.lin);
+};
 var pasa = function(r){
   return pasaDep(r.dep)
-      && (f.fam === "*" || r.fam === f.fam)
+      && pasaFam(r.fam)
       && (f.cat === "*" || r.cat === f.cat);
 };
-var hayFiltro = function(){ return f.grp!=="*" || f.dep!=="*" || f.fam!=="*" || f.cat!=="*"; };
+var hayFiltro = function(){ return f.grp!=="*" || f.dep!=="*" || f.lin!=="*" || f.fam!=="*" || f.cat!=="*"; };
 
 /** Agrupa las filas de stock que pasan el filtro por la clave que se pida. */
 function agrupar(clave){
@@ -808,10 +822,32 @@ function opciones(sel, lista, etiquetaTodos, rotulo){
     }).join("");
 }
 
+/**
+ * Opciones de familia agrupadas por línea, como el árbol de Odoo. Sin
+ * líneas en los datos, una lista plana.
+ */
+function opcionesFamilias(familias, etiquetaTodos, elegida, primero){
+  var opt = function(m){
+    return '<option value="'+esc(m)+'"'+(m === elegida ? ' selected' : '')+'>'+esc(m)+'</option>';
+  };
+  var html = primero || '<option value="*">'+etiquetaTodos+'</option>';
+  if (!hayLineas()) return html + familias.map(opt).join("");
+  var porLinea = {}, orden = [];
+  familias.forEach(function(m){
+    var l = lineaDe(m) || "Sin línea";
+    if (!porLinea[l]) { porLinea[l] = []; orden.push(l); }
+    porLinea[l].push(m);
+  });
+  return html + orden.map(function(l){
+    return '<optgroup label="'+esc(l)+'">'+porLinea[l].map(opt).join("")+'</optgroup>';
+  }).join("");
+}
+
 /* Cada filtro sabe leer su dato de una fila de stock. */
 var LECTOR = {
   grp: function(r){ return grupoDe(r.dep); },
   dep: function(r){ return r.dep; },
+  lin: function(r){ return lineaDe(r.fam); },
   fam: function(r){ return r.fam; },
   cat: function(r){ return r.cat; },
 };
@@ -835,7 +871,7 @@ function posibles(campo){
 
 /** Atenúa en los desplegables lo que no existe con los otros filtros puestos. */
 function actualizarOpciones(){
-  ["grp","dep","fam","cat"].forEach(function(campo){
+  ["grp","dep","lin","fam","cat"].forEach(function(campo){
     var sel = document.getElementById("f-" + campo);
     var ok = posibles(campo);
     Array.prototype.forEach.call(sel.options, function(op){
@@ -873,7 +909,11 @@ function armarFiltros(){
   var pesoFam = {};
   STOCK.forEach(function(r){ pesoFam[r.fam] = (pesoFam[r.fam]||0) + r.v; });
   var familias = Object.keys(pesoFam).sort(function(a,b){ return pesoFam[b]-pesoFam[a]; });
-  opciones(document.getElementById("f-fam"), familias, "Familia: todas");
+  var lineas = [];
+  familias.forEach(function(x){ var l = lineaDe(x); if (l && lineas.indexOf(l) < 0) lineas.push(l); });
+  opciones(document.getElementById("f-lin"), lineas, "Línea: todas");
+  document.getElementById("f-lin").hidden = lineas.length < 2;
+  document.getElementById("f-fam").innerHTML = opcionesFamilias(familias, "Familia: todas");
 
   var presentes = CATS.filter(function(c){
     return STOCK.some(function(r){ return r.cat === c.k; });
@@ -882,11 +922,12 @@ function armarFiltros(){
   selCat.innerHTML = '<option value="*">Categoría: todas</option>' +
     presentes.map(function(c){ return '<option value="'+c.k+'">'+esc(c.lab)+'</option>'; }).join("");
 
-  ["grp","dep","fam","cat"].forEach(function(campo){
+  ["grp","dep","lin","fam","cat"].forEach(function(campo){
     document.getElementById("f-" + campo).addEventListener("change", function(){
       f[campo] = this.value;
-      /* Un depósito de otro grupo no puede quedar elegido. */
+      /* Un depósito de otro grupo, o una familia de otra línea, no puede quedar elegido. */
       if (campo === "grp" && f.dep !== "*" && f.grp !== "*" && grupoDe(f.dep) !== f.grp) f.dep = "*";
+      if (campo === "lin" && f.fam !== "*" && f.lin !== "*" && lineaDe(f.fam) !== f.lin) f.fam = "*";
       registrar(campo); reflejarFiltros(); pintar(); sincronizarSerie();
     });
   });
@@ -1132,7 +1173,7 @@ function restaurarEstado(){
   });
 
   restaurando = true;
-  ["grp","dep","fam","cat"].forEach(function(k){
+  ["grp","dep","lin","fam","cat"].forEach(function(k){
     if (e[k]) { f[k] = e[k]; registrar(k); }
   });
   if (e.s) serieActiva = e.s;
@@ -1170,7 +1211,7 @@ function pintar(){
   var prod = {}, prodLetra = {};
   ARTICULOS.forEach(function(a){
     if (!pasaDep(a[A_DEP])) return;
-    if (f.fam !== "*" && a[A_FAM] !== f.fam) return;
+    if (!pasaFam(a[A_FAM])) return;
     if (f.cat !== "*" && a[A_CAT] !== f.cat) return;
     var k = a[A_REF] + "|" + a[A_NOM];
     prod[k] = true;
@@ -1312,6 +1353,7 @@ function etiquetaFiltro(){
   var p = [];
   if (f.grp !== "*") p.push(f.grp);
   if (f.dep !== "*") p.push(f.dep);
+  if (f.lin !== "*") p.push(f.lin);
   if (f.fam !== "*") p.push(f.fam);
   if (f.cat !== "*") p.push("categoría " + f.cat);
   return p.length ? p.join(" · ") : "Todos los depósitos";
@@ -1325,6 +1367,7 @@ function sinResultados(){
   var puestos = [];
   if (f.grp !== "*") puestos.push("grupo " + f.grp);
   if (f.dep !== "*") puestos.push("depósito " + f.dep);
+  if (f.lin !== "*") puestos.push("línea " + f.lin);
   if (f.fam !== "*") puestos.push("familia " + f.fam);
   if (f.cat !== "*") puestos.push("categoría " + f.cat);
 
@@ -1367,13 +1410,13 @@ function resumenDepositos(){
   var res = {};
   Object.keys(DEPOS).forEach(function(d){ res[d] = nuevoResumen(d); });
   STOCK.forEach(function(r){
-    if (f.fam !== "*" && r.fam !== f.fam) return;
+    if (!pasaFam(r.fam)) return;
     if (f.cat !== "*" && r.cat !== f.cat) return;
     var x = res[r.dep] || (res[r.dep] = nuevoResumen(r.dep));
     x.qs += r.q || 0; x.vs += r.v;
   });
   ROT_DEP.forEach(function(a){
-    if (f.fam !== "*" && a[R_FAM] !== f.fam) return;
+    if (!pasaFam(a[R_FAM])) return;
     if (f.cat !== "*" && a[R_CAT] !== f.cat) return;
     var x = res[a[R_DEP]] || (res[a[R_DEP]] = nuevoResumen(a[R_DEP]));
     var qv = ventaDe(a);
@@ -1383,7 +1426,7 @@ function resumenDepositos(){
     if (est === "agotado" || est === "reponer") x.rep += 1;
     if (est === "parado") x.par += 1;
   });
-  var conFiltro = f.fam !== "*" || f.cat !== "*";
+  var conFiltro = f.lin !== "*" || f.fam !== "*" || f.cat !== "*";
   return Object.keys(res).map(function(d){ return cerrarResumen(res[d]); })
     .filter(function(x){
       if (f.grp !== "*" && x.grp !== f.grp) return false;
@@ -1506,7 +1549,7 @@ function filasRotDep(conEstado){
   var q = (document.getElementById("q-dep").value || "").trim().toLowerCase();
   return ROT_DEP.filter(function(a){
     if (!pasaDep(a[R_DEP])) return false;
-    if (f.fam !== "*" && a[R_FAM] !== f.fam) return false;
+    if (!pasaFam(a[R_FAM])) return false;
     if (f.cat !== "*" && a[R_CAT] !== f.cat) return false;
     if (q && (a[R_NOM] + " " + a[R_REF]).toLowerCase().indexOf(q) < 0) return false;
     return true;
@@ -1675,20 +1718,28 @@ function tablaFamilias(T){
   if (sec.hidden) return;
 
   document.getElementById("nota-fam").textContent =
-    "Millones de guaraníes · categoría de producto de Odoo · clic para filtrar";
+    "Millones de guaraníes · agrupado como el árbol de categorías de Odoo · clic para filtrar";
 
   filas.forEach(function(r){ r._t = suma(r); });
-  filas = ordenar(filas, orden.fam.k, orden.fam.asc);
   marcarOrden("#tbl-fam", orden.fam);
   var max = filas.reduce(function(m,r){ return Math.max(m, r._t); }, 0);
 
+  /* Agrupadas por línea, como el árbol de categorías de Odoo: las líneas de
+     mayor valor primero y, dentro de cada una, el orden elegido. */
+  var porLinea = {};
+  filas.forEach(function(r){ var l = lineaDe(r.k) || ""; (porLinea[l] = porLinea[l] || []).push(r); });
+  var lineas = Object.keys(porLinea).sort(function(a,b){
+    var ta = porLinea[a].reduce(function(t,r){ return t + r._t; }, 0);
+    var tb2 = porLinea[b].reduce(function(t,r){ return t + r._t; }, 0);
+    return tb2 - ta;
+  });
+  var agrupar2 = lineas.length > 1;
+
   var s = Object.assign({ q:0 }, vacio);
   var tb = document.querySelector("#tbl-fam tbody"), tf = document.querySelector("#tbl-fam tfoot");
-  tb.innerHTML = filas.map(function(r){
-    CLAVES.forEach(function(k){ s[k] += r[k] || 0; });
-    s.q += r.q;
+  var fila = function(r){
     var w = max ? r._t/max*100 : 0;
-    return '<tr data-fam="'+esc(r.k)+'" style="cursor:pointer"'+(r.k === f.fam ? ' class="sel-fila"' : '')+'>'+
+    return '<tr data-fam="'+esc(r.k)+'" class="'+(agrupar2 ? "dep" : "")+(r.k === f.fam ? " sel-fila" : "")+'" style="cursor:pointer">'+
       '<td><b>'+esc(r.k)+'</b></td>'+
       CLAVES.map(function(k){ return celda(r[k], k); }).join('')+
       '<td class="num">'+fmtQ(r.q)+'</td>'+
@@ -1699,6 +1750,24 @@ function tablaFamilias(T){
       '<td><div class="bar" title="'+esc(r.k)+': '+fmtM(r._t)+' M"><span '+
         'style="display:flex;height:100%;width:'+w.toFixed(1)+'%">'+barra(r)+
       '</span></div></td></tr>';
+  };
+  tb.innerHTML = lineas.map(function(l){
+    var lista = ordenar(porLinea[l], orden.fam.k, orden.fam.asc);
+    var sub = Object.assign({ q:0 }, vacio);
+    lista.forEach(function(r){
+      CLAVES.forEach(function(k){ sub[k] += r[k] || 0; s[k] += r[k] || 0; });
+      sub.q += r.q; s.q += r.q;
+    });
+    var tsub = suma(sub);
+    var cabecera = agrupar2
+      ? '<tr class="grp'+(f.lin === l ? " on" : "")+'" data-lin="'+esc(l)+'" title="Filtrar por '+esc(l)+'">'+
+        '<td>'+esc(l || "Sin línea")+' <span class="count" style="font-family:var(--mono);text-transform:none;letter-spacing:0">'+
+        fmt(lista.length)+(lista.length === 1 ? " familia" : " familias")+'</span></td>'+
+        CLAVES.map(function(k){ return celda(sub[k], k); }).join('')+
+        '<td class="num">'+fmtQ(sub.q)+'</td><td class="num"><b>'+fmtM(tsub)+'</b></td>'+
+        '<td class="num">'+pct(tsub, T)+'</td><td></td></tr>'
+      : '';
+    return cabecera + lista.map(fila).join("");
   }).join("");
   tf.innerHTML = '<tr><td>Total</td>'+CLAVES.map(function(k){ return celda(s[k], k); }).join('')+
     '<td class="num">'+fmtQ(s.q)+'</td><td class="num">'+fmtM(T)+'</td><td class="num">100%</td><td></td></tr>';
@@ -1706,6 +1775,14 @@ function tablaFamilias(T){
     tr.addEventListener("click", function(){
       f.fam = (f.fam === tr.dataset.fam) ? "*" : tr.dataset.fam;
       registrar("fam");
+      reflejarFiltros(); pintar(); sincronizarSerie();
+    });
+  });
+  Array.prototype.forEach.call(tb.querySelectorAll("tr[data-lin]"), function(tr){
+    tr.addEventListener("click", function(){
+      f.lin = (f.lin === tr.dataset.lin) ? "*" : tr.dataset.lin;
+      if (f.fam !== "*" && f.lin !== "*" && lineaDe(f.fam) !== f.lin) f.fam = "*";
+      registrar("lin");
       reflejarFiltros(); pintar(); sincronizarSerie();
     });
   });
@@ -1765,7 +1842,7 @@ function articulosFiltrados(){
   var q = (document.getElementById("q-art").value || "").trim().toLowerCase();
   return ARTICULOS.filter(function(a){
     if (!pasaDep(a[A_DEP])) return false;
-    if (f.fam !== "*" && a[A_FAM] !== f.fam) return false;
+    if (!pasaFam(a[A_FAM])) return false;
     if (f.cat !== "*" && a[A_CAT] !== f.cat) return false;
     if (q && (a[A_NOM]+" "+a[A_REF]).toLowerCase().indexOf(q) < 0) return false;
     return true;
@@ -1862,7 +1939,7 @@ function registrar(campo){
 
 /** Deja los desplegables coincidiendo con el estado de filtros. */
 function reflejarFiltros(){
-  ["grp","dep","fam","cat"].forEach(function(k){
+  ["grp","dep","lin","fam","cat"].forEach(function(k){
     document.getElementById("f-" + k).value = f[k];
   });
 }
@@ -1874,6 +1951,7 @@ function pintarActivos(){
   var partes = [];
   if (f.grp !== "*") partes.push(["grp", "Grupo",     f.grp]);
   if (f.dep !== "*") partes.push(["dep", "Depósito",  f.dep]);
+  if (f.lin !== "*") partes.push(["lin", "Línea",     f.lin]);
   if (f.fam !== "*") partes.push(["fam", "Familia",   f.fam]);
   if (f.cat !== "*") partes.push(["cat", "Categoría", etiquetaCat[f.cat] || f.cat]);
 
@@ -1897,7 +1975,7 @@ function familiasConSerie(){
   var visibles = {};
   STOCK.forEach(function(r){
     if (!pasaDep(r.dep)) return;
-    if (f.fam !== "*" && r.fam !== f.fam) return;
+    if (!pasaFam(r.fam)) return;
     visibles[r.fam] = true;
   });
   return Object.keys(SERIES_FAM)
@@ -1977,12 +2055,9 @@ function sincronizarSerie(){
   }
   if (esTodas(serieActiva)) articuloActivo = null;
 
-  sel.innerHTML =
+  sel.innerHTML = opcionesFamilias(lista, "", serieActiva,
     '<option value="'+TODAS+'"'+(esTodas(serieActiva)?' selected':'')+'>'+
-      'Todas las familias ('+fmt(lista.length)+')</option>' +
-    lista.map(function(m){
-      return '<option value="'+esc(m)+'"'+(m===serieActiva?' selected':'')+'>'+esc(m)+'</option>';
-    }).join("");
+      'Todas las familias ('+fmt(lista.length)+')</option>');
   evolucion(); rotacion(); rotacionArticulos();
   guardarEstado();
 }
