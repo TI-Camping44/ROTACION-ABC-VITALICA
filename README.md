@@ -30,7 +30,7 @@ lectura de listas de precios con las dos empresas en el contexto y
 3. Configuración del proyecto → Propiedades del script:
    `ODOO_URL`, `ODOO_DB`, `ODOO_LOGIN`, `ODOO_API_KEY`, `GITHUB_TOKEN`
    y, opcional, `STK_AVISAR_A` (correo si falla la corrida automática).
-4. Subir el logo como **`LOGO-VITALICA.png`** a la raíz de este repo. Sin él,
+4. Subir el logo como **`logo-vitalica.png`** a la raíz de este repo. Sin él,
    el reporte muestra una "V".
 5. Settings → Pages → rama `main`, carpeta raíz.
 6. Ejecutar `stkInstalarMenu()` una vez y recargar la planilla.
