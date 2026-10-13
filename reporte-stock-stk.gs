@@ -123,6 +123,9 @@ const STK = Object.freeze({
                                          'GTLOM', 'GTLUQ', 'GTMCA', 'GTCVE'] },
   ]),
   GRUPO_DEFECTO: 'Otros',
+  /* Grupo de las ubicaciones no comerciales que no cuelgan de ningún almacén
+     con grupo (en Vitalica, Exhibición y Marketing están sueltas). */
+  GRUPO_NO_COMERCIAL: 'No comerciales',
 
   /* Depósitos cuyo stock está en CONSIGNACIÓN: existe y se vende, pero está en
      manos de un tercero. El reporte lo suma al total y lo muestra aparte, para
@@ -137,11 +140,13 @@ const STK = Object.freeze({
   ]),
 
   /* Depósitos o ubicaciones cuyo stock existe pero NO se vende: exhibición y
-     material de marketing. Se compara contra la ruta completa de la ubicación
-     (sin acentos ni mayúsculas, por coincidencia parcial). Si la ubicación
-     está dentro de un almacén vendible, se separa como depósito propio para
-     que su stock no se mezcle con el del almacén. */
-  DEPOSITOS_NO_COMERCIALES: Object.freeze(['Exhibición Showroom', 'Marketing']),
+     material de marketing. Se compara contra cada tramo de la ruta de la
+     ubicación (sin acentos ni mayúsculas, por coincidencia parcial). Si la
+     ubicación está dentro de un almacén vendible, se separa como depósito
+     propio para que su stock no se mezcle con el del almacén.
+     Ojo: "Showroom" solo no sirve, porque también es el nombre del almacén
+     VI-SH, que sí vende. En Odoo la ubicación es "Exhibición Vitalica Showroom". */
+  DEPOSITOS_NO_COMERCIALES: Object.freeze(['Exhibición', 'Marketing']),
 
   /* Umbrales de cobertura, en meses de venta, para el estado de cada artículo
      en cada depósito:
@@ -179,6 +184,8 @@ const STK = Object.freeze({
   CATEGORIAS_EXCLUIDAS: Object.freeze([
     'NO USAR', 'Ajustes', 'Descuento', 'Anticipo de Cliente',
     'Gastos de Importación (Landed Cost)', 'Intereses', 'Servicios',
+    /* Del árbol de Vitalica: categorías contables, no mercadería. */
+    'DESCUENTOS COMERCIALES', 'Expenses', 'Impuestos no capitalizables', 'IVA Despacho',
   ]),
 
   HOJAS: Object.freeze({
@@ -1130,7 +1137,7 @@ function stkActualizarDatos() {
     const D = {
       CATS: STK_CATS, GENERADO: stkAhora_(), EMPRESA: STK.EMPRESA, NORMA: STK.NORMA,
       VALORIZACION: stock.modo,
-      GRUPOS: STK.GRUPOS_DEPOSITO.map(g => g.grupo).concat([STK.GRUPO_DEFECTO]),
+      GRUPOS: stkGruposEnOrden_(),
       DEPOS: rotDep.depos,
       NO_COMERCIAL: Object.keys(rotDep.depos).filter(d => rotDep.depos[d].nc),
       CONSIGNACION: Object.keys(rotDep.depos).filter(d => rotDep.depos[d].consig),
@@ -1332,9 +1339,15 @@ function stkGrupoDeposito_(codigo, nombre) {
   return STK.GRUPO_DEFECTO;
 }
 
+/** Orden de los grupos en el reporte: los configurados, después los no comerciales y al final "Otros". */
+function stkGruposEnOrden_() {
+  return STK.GRUPOS_DEPOSITO.map(g => g.grupo).concat([STK.GRUPO_NO_COMERCIAL, STK.GRUPO_DEFECTO]);
+}
+
 function stkOrdenGrupo_(grupo) {
-  const i = STK.GRUPOS_DEPOSITO.map(g => g.grupo).indexOf(grupo);
-  return i < 0 ? STK.GRUPOS_DEPOSITO.length : i;
+  const lista = stkGruposEnOrden_();
+  const i = lista.indexOf(grupo);
+  return i < 0 ? lista.length : i;
 }
 
 /** El tramo de la ruta que coincide con un depósito no comercial, o ''. */
@@ -1390,9 +1403,10 @@ function stkDepositos_(sesion, empresa) {
 
     porUbicacion[u.id] = nombre;
     if (!info[nombre]) {
+      const grupo = stkGrupoDeposito_(cod, base);
       info[nombre] = {
         cod: cod,
-        grupo: stkGrupoDeposito_(cod, base),
+        grupo: tramo && grupo === STK.GRUPO_DEFECTO ? STK.GRUPO_NO_COMERCIAL : grupo,
         consig: !tramo && stkEnLista_(cod, base, STK.DEPOSITOS_CONSIGNACION),
         nc: Boolean(tramo),
       };
