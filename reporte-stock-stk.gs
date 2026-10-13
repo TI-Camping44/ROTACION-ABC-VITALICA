@@ -174,6 +174,16 @@ const STK = Object.freeze({
     { canal: 'Exterior',         claves: ['EXT'] },
   ]),
 
+  /* FAMILIAS UNIFICADAS
+     La familia es la última hoja del árbol de categorías. Cuando una misma
+     familia está repartida en varias categorías de Odoo, se junta acá.
+     Cada categoría se escribe como el final de su ruta, con " / " entre
+     tramos: "Proteína / VITALICA" coincide con ALL / Proteína / VITALICA y no
+     con cualquier otra categoría que se llame VITALICA. */
+  FAMILIAS_UNIFICADAS: Object.freeze([
+    { familia: 'Proteínas', categorias: ['Suplementos (Padre) / Proteínas', 'Proteína', 'Proteína / VITALICA'] },
+  ]),
+
   /* Productos que quedan fuera del reporte, por referencia interna. */
   PRODUCTOS_EXCLUIDOS: Object.freeze([]),
 
@@ -436,7 +446,7 @@ function stkDiagnosticar() {
         ruta,
         c.property_cost_method || 'sin definir',
         c.property_valuation === 'real_time' ? 'automática' : 'MANUAL',
-        stkExcluida_(ruta) ? 'excluida del reporte' : (stkLimpiar_(stkHojaCategoria_(ruta)) || 'Sin familia'),
+        stkExcluida_(ruta) ? 'excluida del reporte' : stkFamilia_(ruta),
       ];
     })
     .sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'es'));
@@ -1048,7 +1058,7 @@ function stkDetectarMarcas() {
   const filas = productos
     .filter(p => p[STK.CAMPO_MARCA])
     .map(p => [String(p.default_code || '').trim(), stkLimpiar_(p.name || ''),
-               stkLimpiar_(stkHojaCategoria_(stkNombre_(p.categ_id))),
+               stkFamilia_(stkNombre_(p.categ_id)),
                stkLimpiar_(stkNombre_(p[STK.CAMPO_MARCA]))]);
 
   stkEscribir_(STK.HOJAS.MARCAS, ['Referencia', 'Producto', 'Familia', 'Marca'], filas, []);
@@ -1260,9 +1270,9 @@ function stkProductos_(sesion, empresa) {
       referencia: String(t.default_code || '').trim(),
       nombre: stkLimpiar_(t.name || ''),
       categoriaProducto,
-      /* Familia: la hoja del árbol de categorías de Odoo. El árbol es
-         ALL / Suplementos (Padre) / <familia> o ALL / <familia>. */
-      familia: stkLimpiar_(stkHojaCategoria_(categoriaProducto)) || 'Sin familia',
+      /* Familia: la hoja del árbol de categorías de Odoo (ALL / Suplementos
+         (Padre) / <familia> o ALL / <familia>), salvo las unificadas. */
+      familia: stkFamilia_(categoriaProducto),
       abc: stkVisible_(meta[STK.CAMPO_ABC], t[STK.CAMPO_ABC]),
       costo: stkNum_(t.standard_price),
     };
@@ -1307,6 +1317,25 @@ function stkCategoria_(p) {
 function stkHojaCategoria_(rutaCompleta) {
   const partes = String(rutaCompleta || '').split('/');
   return partes[partes.length - 1].trim();
+}
+
+/**
+ * Familia del reporte para una categoría de Odoo: la de STK.FAMILIAS_UNIFICADAS
+ * si la ruta termina en alguna de las configuradas, y si no, la última hoja.
+ */
+function stkFamilia_(rutaCompleta) {
+  const tramos = String(rutaCompleta || '').split('/').map(stkNorm_);
+  for (let i = 0; i < STK.FAMILIAS_UNIFICADAS.length; i++) {
+    const regla = STK.FAMILIAS_UNIFICADAS[i];
+    const coincide = regla.categorias.some(c => {
+      const buscados = String(c).split('/').map(stkNorm_);
+      if (buscados.length > tramos.length) return false;
+      const cola = tramos.slice(tramos.length - buscados.length);
+      return buscados.every((t, j) => t === cola[j]);
+    });
+    if (coincide) return regla.familia;
+  }
+  return stkLimpiar_(stkHojaCategoria_(rutaCompleta)) || 'Sin familia';
 }
 
 /** Referencias apartadas del reporte por decisión, no por categoría. */
