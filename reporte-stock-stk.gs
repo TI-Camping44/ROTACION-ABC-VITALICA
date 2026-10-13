@@ -229,7 +229,16 @@ function stkSesion_() {
       'Configuración del proyecto → Propiedades del script.'
     );
   }
-  const url = props.getProperty('ODOO_URL').replace(/\/+$/, '');
+  /* Solo el dominio. Es fácil pegar la dirección del navegador
+     (".../odoo/inventory", ".../web#action=...") y el script terminaba
+     pidiendo ".../odoo/inventory/jsonrpc", que Odoo contesta con un 404. */
+  const crudo = String(props.getProperty('ODOO_URL')).trim();
+  const conEsquema = /^https?:\/\//i.test(crudo) ? crudo : 'https://' + crudo;
+  const dominio = conEsquema.match(/^https?:\/\/[^\/?#\s]+/i);
+  if (!dominio) {
+    throw new Error(`ODOO_URL no parece una dirección: "${crudo}". Tiene que ser como https://algo.odoo.com`);
+  }
+  const url = dominio[0];
   const db = props.getProperty('ODOO_DB');
   const login = props.getProperty('ODOO_LOGIN');
   const clave = props.getProperty('ODOO_API_KEY');
