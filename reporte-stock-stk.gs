@@ -1872,7 +1872,7 @@ function stkBitacora_(stock) {
   if (hoja.getLastRow() < 1) {
     hoja.getRange(1, 1, 1, titulos.length).setValues([titulos]);
     hoja.getRange(1, 1, 1, titulos.length)
-      .setBackground('#12161A').setFontColor('#FFFFFF').setFontWeight('bold');
+      .setBackground('#525252').setFontColor('#FFFFFF').setFontWeight('bold');
     hoja.setFrozenRows(1);
   }
   hoja.appendRow(fila);
@@ -2088,7 +2088,7 @@ function stkEscribir_(nombre, titulos, filas, columnasNumericas) {
     h.getRange(1, 1, filas.length + 1, titulos.length).createFilter();
   }
   h.getRange(1, 1, 1, titulos.length)
-    .setBackground('#12161A').setFontColor('#FFFFFF').setFontWeight('bold').setWrap(true);
+    .setBackground('#525252').setFontColor('#FFFFFF').setFontWeight('bold').setWrap(true);
   h.setFrozenRows(1);
   h.autoResizeColumns(1, titulos.length);
 }
