@@ -1988,6 +1988,9 @@ function stkBitacora_(stock) {
     hoja.setFrozenRows(1);
   }
   hoja.appendRow(fila);
+  /* La fecha va como texto: si no, Sheets la convierte y al releerla vuelve
+     como "Tue Oct 13 2026 15:41:00 GMT-0300". */
+  hoja.getRange(hoja.getLastRow(), 1).setNumberFormat('@').setValue(fila[0]);
   hoja.getRange(hoja.getLastRow(), 2, 1, titulos.length - 1).setNumberFormat('#,##0');
 
   /* Solo se conservan las últimas 400 corridas. */
@@ -1997,7 +2000,10 @@ function stkBitacora_(stock) {
   const cambios = {};
   claves.forEach((k, i) => { cambios[k] = Math.round(t[k] - stkNum_(anterior[i + 2])); });
   return {
-    desde: String(anterior[0]),
+    /* Las corridas viejas pueden haber quedado convertidas en fecha. */
+    desde: anterior[0] instanceof Date
+      ? Utilities.formatDate(anterior[0], STK.ZONA_HORARIA, 'dd/MM/yyyy HH:mm')
+      : String(anterior[0]),
     total: Math.round(total - stkNum_(anterior[1])),
     cambios: cambios,
     articulos: stock.articulos.length - stkNum_(anterior[9]),
