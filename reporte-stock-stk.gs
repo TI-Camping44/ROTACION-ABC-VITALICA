@@ -96,6 +96,8 @@ const STK = Object.freeze({
      confirmarlo desde "2. Detectar marcas". */
   CAMPO_MARCA: 'product_brand_id',
 
+  /* Tope del histórico. Si Odoo tiene capas desde hace menos tiempo, el
+     gráfico arranca en el primer mes con datos y crece solo hasta este tope. */
   MESES_HISTORICO: 18,
   MESES_ROTACION: 6,
   /* Topes del archivo publicado. Vitalica tiene un orden de magnitud menos de
@@ -127,17 +129,21 @@ const STK = Object.freeze({
      con grupo (en Vitalica, Exhibición y Marketing están sueltas). */
   GRUPO_NO_COMERCIAL: 'No comerciales',
 
-  /* Depósitos cuyo stock está en CONSIGNACIÓN: existe y se vende, pero está en
-     manos de un tercero. El reporte lo suma al total y lo muestra aparte, para
-     que no se lea como mercadería en depósito propio.
-     Por defecto, todos los gimnasios. Pendiente de confirmar con Gerencia: si
-     no es consignación, vaciar la lista. Se compara contra el código o el
+  /* Depósitos que son MUESTRARIO: el kit de exhibición que Vitalica deja en
+     cada gimnasio. Es stock propio y suma al total, pero no se vende desde
+     ahí (las ventas salen de Casa Central), así que no lleva estado de
+     reposición ni cuenta como "parado". Se compara contra el código o el
      nombre del almacén, sin acentos ni mayúsculas. */
-  DEPOSITOS_CONSIGNACION: Object.freeze([
+  DEPOSITOS_MUESTRARIO: Object.freeze([
     'RMLAM',
     'BLPER', 'BCENT', 'BSEIF', 'BHERR',
     'GTFZS', 'GTACN', 'GTCGR', 'GTFDM', 'GTLAM', 'GTLOM', 'GTLUQ', 'GTMCA', 'GTCVE',
   ]),
+
+  /* Depósitos de ABASTECIMIENTO: guardan la reserva que repone a los que
+     venden, y no venden directo. Su cobertura se mide contra la venta de
+     toda la empresa, no contra la propia, que es cero. */
+  DEPOSITOS_ABASTECIMIENTO: Object.freeze(['MGLOG']),
 
   /* Depósitos o ubicaciones cuyo stock existe pero NO se vende: exhibición y
      material de marketing. Se compara contra cada tramo de la ruta de la
@@ -538,17 +544,18 @@ function stkDiagnosticoDepositos_(sesion, empresa) {
     stkOrdenGrupo_(dep.info[a].grupo) - stkOrdenGrupo_(dep.info[b].grupo) || a.localeCompare(b, 'es'));
 
   stkEscribir_('DIAGNOSTICO DEPOSITOS',
-    ['Depósito en el reporte', 'Código del almacén', 'Grupo', 'Consignación', 'No comercial'],
+    ['Depósito en el reporte', 'Código del almacén', 'Grupo', 'Tipo'],
     nombres.map(n => {
       const i = dep.info[n];
-      return [n, i.cod, i.grupo, i.consig ? 'Sí' : '', i.nc ? 'Sí' : ''];
+      return [n, i.cod, i.grupo, stkTipoDeposito_(i)];
     }), []);
 
   const codigos = {};
   nombres.forEach(n => { codigos[stkNorm_(dep.info[n].cod)] = true; codigos[stkNorm_(n)] = true; });
   const configurados = [];
   STK.GRUPOS_DEPOSITO.forEach(g => g.codigos.forEach(c => configurados.push(c)));
-  STK.DEPOSITOS_CONSIGNACION.forEach(c => { if (configurados.indexOf(c) < 0) configurados.push(c); });
+  STK.DEPOSITOS_MUESTRARIO.concat(STK.DEPOSITOS_ABASTECIMIENTO)
+    .forEach(c => { if (configurados.indexOf(c) < 0) configurados.push(c); });
 
   return {
     almacenes: Object.keys(dep.almacenes).length,
@@ -1101,7 +1108,7 @@ function stkActualizarDatos() {
     stkToast_('Leyendo existencias valorizadas...');
     const stock = stkStock_(sesion, empresa, productos);
     stkEscribir_(STK.HOJAS.STOCK,
-      ['Familia', 'Depósito', 'Grupo', 'Consignación', 'Categoría', 'Cantidad', 'Valor (Gs.)'],
+      ['Familia', 'Depósito', 'Grupo', 'Tipo', 'Categoría', 'Cantidad', 'Valor (Gs.)'],
       stock.filas, [6, 7]);
     stkEscribir_(STK.HOJAS.ARTICULOS,
       ['Referencia', 'Producto', 'Familia', 'Depósito', 'Categoría', 'Cantidad', 'Valor (Gs.)'],
@@ -1128,10 +1135,10 @@ function stkActualizarDatos() {
        cada gimnasio y qué está parado. */
     const rotDep = stkRotacionDepositos_(stock, salidas);
     stkEscribir_(STK.HOJAS.DEPOSITOS,
-      ['Depósito', 'Código', 'Grupo', 'Consignación', 'No comercial', 'Unidades en stock',
+      ['Depósito', 'Código', 'Grupo', 'Tipo', 'Unidades en stock',
        'Valor (Gs.)', `Unidades vendidas ${STK.MESES_ROTACION} meses`,
        `Costo de venta ${STK.MESES_ROTACION} meses (Gs.)`, 'Última venta'],
-      rotDep.resumen, [6, 7, 8, 9]);
+      rotDep.resumen, [5, 6, 7, 8]);
 
     /* Auditoría: queda en la hoja BITACORA de la planilla. */
     const cambio = stkBitacora_(stock);
@@ -1150,7 +1157,8 @@ function stkActualizarDatos() {
       GRUPOS: stkGruposEnOrden_(),
       DEPOS: rotDep.depos,
       NO_COMERCIAL: Object.keys(rotDep.depos).filter(d => rotDep.depos[d].nc),
-      CONSIGNACION: Object.keys(rotDep.depos).filter(d => rotDep.depos[d].consig),
+      MUESTRARIO: Object.keys(rotDep.depos).filter(d => rotDep.depos[d].mues),
+      ABASTECIMIENTO: Object.keys(rotDep.depos).filter(d => rotDep.depos[d].abas),
       UMBRALES: { min: STK.COBERTURA_MINIMA, max: STK.COBERTURA_MAXIMA },
       MESES: hist.cierres.map(c => c.etiqueta),
       MESES_ROT: STK.MESES_ROTACION,
@@ -1401,7 +1409,7 @@ function stkTramoNoComercial_(ruta) {
  * sumaba al del almacén y no había forma de verlo aparte.
  *
  * Devuelve el mapa de ubicaciones y, por depósito, su código, grupo y si es
- * consignación o no comercial.
+ * si es muestrario, de abastecimiento o no comercial.
  */
 function stkDepositos_(sesion, empresa) {
   const almacenes = {};
@@ -1436,7 +1444,8 @@ function stkDepositos_(sesion, empresa) {
       info[nombre] = {
         cod: cod,
         grupo: tramo && grupo === STK.GRUPO_DEFECTO ? STK.GRUPO_NO_COMERCIAL : grupo,
-        consig: !tramo && stkEnLista_(cod, base, STK.DEPOSITOS_CONSIGNACION),
+        mues: !tramo && stkEnLista_(cod, base, STK.DEPOSITOS_MUESTRARIO),
+        abas: !tramo && stkEnLista_(cod, base, STK.DEPOSITOS_ABASTECIMIENTO),
         nc: Boolean(tramo),
       };
     }
@@ -1446,7 +1455,11 @@ function stkDepositos_(sesion, empresa) {
 
 function stkInfoDeposito_(depositos, nombre) {
   return depositos.info[nombre] ||
-         { cod: '', grupo: STK.GRUPO_DEFECTO, consig: false, nc: false };
+         { cod: '', grupo: STK.GRUPO_DEFECTO, mues: false, abas: false, nc: false };
+}
+
+function stkTipoDeposito_(i) {
+  return i.nc ? 'No comercial' : i.mues ? 'Muestrario' : i.abas ? 'Abastecimiento' : 'Venta';
 }
 
 
@@ -1508,7 +1521,7 @@ function stkStock_(sesion, empresa, productos) {
   const filas = Object.keys(acumulado).sort().map(clave => {
     const k = clave.split('|');
     const d = stkInfoDeposito_(depositos, k[1]);
-    return [k[0], k[1], d.grupo, d.consig ? 'Sí' : '', k[2],
+    return [k[0], k[1], d.grupo, stkTipoDeposito_(d), k[2],
             Math.round(acumulado[clave].q * 100) / 100, Math.round(acumulado[clave].v)];
   });
   const lista = Object.keys(porArticulo).map(k => porArticulo[k])
@@ -1681,9 +1694,9 @@ function stkRotacionDepositos_(stock, salidas) {
     })
     .map(d => {
       const i = stkInfoDeposito_(stock.depositos, d);
-      depos[d] = { cod: i.cod, grupo: i.grupo, consig: i.consig, nc: i.nc };
+      depos[d] = { cod: i.cod, grupo: i.grupo, mues: i.mues, abas: i.abas, nc: i.nc };
       const r = res[d];
-      return [d, i.cod, i.grupo, i.consig ? 'Sí' : '', i.nc ? 'Sí' : '',
+      return [d, i.cod, i.grupo, stkTipoDeposito_(i),
               Math.round(r.qs * 100) / 100, Math.round(r.vs),
               Math.round(r.qv * 100) / 100, Math.round(r.vv), r.ultima];
     });
@@ -1776,7 +1789,20 @@ function stkCanalPorPedido_(sesion, idsAlbaran) {
 function stkHistorico_(sesion, empresa, productos, valorPorFamilia, valorPorArticulo) {
   const meta = stkCamposDe_(sesion, 'stock.valuation.layer');
   const campoFecha = meta.create_date ? 'create_date' : 'date';
-  const cierres = stkCierres_(STK.MESES_HISTORICO);
+
+  /* Antes de la primera capa no hay historia: esos meses salían planos. El
+     gráfico arranca en el primer mes con datos y crece solo hasta el tope. */
+  const primera = stkEjecutar_(sesion, 'stock.valuation.layer', 'search_read',
+    [[['company_id', '=', empresa.id]]], { fields: [campoFecha], limit: 1, order: `${campoFecha} asc` });
+  let meses = STK.MESES_HISTORICO;
+  if (primera.length) {
+    const f = String(primera[0][campoFecha]);
+    const hoy = new Date();
+    const desde = (hoy.getFullYear() - Number(f.substring(0, 4))) * 12 +
+                  (hoy.getMonth() + 1 - Number(f.substring(5, 7))) + 1;
+    meses = Math.max(2, Math.min(STK.MESES_HISTORICO, desde));
+  }
+  const cierres = stkCierres_(meses);
 
   const capas = stkLeerTodo_(sesion, 'stock.valuation.layer', [
     ['company_id', '=', empresa.id],
@@ -1893,18 +1919,18 @@ function stkResumenCambio_(c) {
 function stkBitacora_(stock) {
   const hoja = stkHoja_(STK.HOJAS.BITACORA);
   const titulos = ['Fecha y hora', 'Stock total (Gs.)', 'A (Gs.)', 'B (Gs.)', 'C (Gs.)',
-                   'N (Gs.)', 'Sin categorizar (Gs.)', 'En consignación (Gs.)', 'Unidades',
+                   'N (Gs.)', 'Sin categorizar (Gs.)', 'En muestrario (Gs.)', 'Unidades',
                    'Artículos por depósito', 'Familias'];
   const claves = ['A', 'B', 'C', 'N', 'NC'];
 
-  /* stock.filas: [familia, depósito, grupo, consignación, categoría, cantidad, valor] */
+  /* stock.filas: [familia, depósito, grupo, tipo, categoría, cantidad, valor] */
   const t = { A: 0, B: 0, C: 0, N: 0, NC: 0 };
-  let consig = 0, unidades = 0;
+  let muestrario = 0, unidades = 0;
   const familias = {};
   stock.filas.forEach(f => {
     const cat = String(f[4]).trim().toUpperCase();
     if (t[cat] !== undefined) t[cat] += stkNum_(f[6]);
-    if (f[3]) consig += stkNum_(f[6]);
+    if (f[3] === 'Muestrario') muestrario += stkNum_(f[6]);
     unidades += stkNum_(f[5]);
     familias[f[0]] = true;
   });
@@ -1912,7 +1938,7 @@ function stkBitacora_(stock) {
 
   const fila = [stkAhora_(), Math.round(total)]
     .concat(claves.map(k => Math.round(t[k])))
-    .concat([Math.round(consig), Math.round(unidades), stock.articulos.length,
+    .concat([Math.round(muestrario), Math.round(unidades), stock.articulos.length,
              Object.keys(familias).length]);
 
   let anterior = null;
