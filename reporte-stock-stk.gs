@@ -231,6 +231,7 @@ function stkMenu() {
     .addItem('1c. Ver campos personalizados', 'stkCamposPersonalizados')
     .addItem('1d. Ver etiquetas de producto', 'stkEtiquetas')
     .addItem('Auditar un producto', 'stkAuditarProducto')
+    .addItem('Buscar el lote de sachets', 'stkBuscarLoteSachets')
     .addItem('Detectar desvíos de valorización', 'stkDesvios')
     .addItem('Ver bitácora de cambios', 'stkVerBitacora')
     .addItem('2. Detectar marcas', 'stkDetectarMarcas')
@@ -2385,4 +2386,154 @@ function stkSS_() {
     );
   }
   return SpreadsheetApp.openById(id);
+}
+
+
+/* ==========================================================================
+   BUSCAR EL LOTE DE SACHETS
+   --------------------------------------------------------------------------
+   De dónde sale: "Detectar desvíos de valorización" marcó ocho sachets con una
+   diferencia exacta entre stock.quant y las capas de valorización, y todas son
+   múltiplo de 20 (son cajas de 20 sachets): siete sabores con 300 unidades
+   justas (15 cajas) y uno con 120 (6 cajas). Eso no es deriva contable, es un
+   lote concreto.
+
+   Esta función contesta la pregunta que decide todo: ¿esas unidades existen
+   en algún lado, o no existen?
+
+     · Si aparecen en una ubicación que NO es depósito interno (tránsito,
+       consignación, control de calidad), el stock está bien y lo que falta es
+       moverlo o incluir esa ubicación en el reporte.
+     · Si no aparecen en ninguna ubicación, entonces las capas de valorización
+       tienen un ingreso que nunca llegó a stock: es un problema contable.
+
+   Sólo lee. No escribe nada en Odoo.
+   ========================================================================== */
+
+const STK_LOTE_SACHETS = [
+  ['5901330092411', 300], ['5901330073878', 300], ['5901330073854', 300],
+  ['5901330090035', 300], ['5901330073830', 300], ['5901330072871', 300],
+  ['5901330072857', 300], ['5901330086700', 120],
+];
+
+function stkBuscarLoteSachets() {
+  const { sesion, empresa } = stkConectar_();
+  const refs = STK_LOTE_SACHETS.map(x => x[0]);
+  const faltanPorRef = {};
+  STK_LOTE_SACHETS.forEach(x => { faltanPorRef[x[0]] = x[1]; });
+
+  /* 1. Las variantes de esas referencias. */
+  const variantes = stkLeerTodo_(sesion, 'product.product',
+    [['default_code', 'in', refs]], ['id', 'default_code', 'name'], 'id asc');
+  if (!variantes.length) {
+    stkAvisar_('Lote de sachets', 'No se encontró ninguna de las ocho referencias.');
+    return;
+  }
+  const idsVar = variantes.map(v => v.id);
+  const refDeVar = {}, nombreDeVar = {};
+  variantes.forEach(v => { refDeVar[v.id] = v.default_code; nombreDeVar[v.id] = v.name; });
+
+  /* 2. Stock en TODAS las ubicaciones, no sólo los depósitos internos.
+        Acá es donde tienen que aparecer las unidades que faltan. */
+  const metaQuant = stkCamposDe_(sesion, 'stock.quant');
+  const quants = stkLeerTodo_(sesion, 'stock.quant', [
+    ['company_id', '=', empresa.id],
+    ['product_id', 'in', idsVar],
+  ], stkCamposQueExisten_(metaQuant,
+    ['id', 'product_id', 'location_id', 'quantity', 'reserved_quantity', 'value']), 'id asc');
+
+  const idsUbic = Array.from(new Set(quants.map(q => stkId_(q.location_id)).filter(Boolean)));
+  const ubic = {};
+  stkLotes_(idsUbic, STK.LOTE_API).forEach(lote => {
+    stkEjecutar_(sesion, 'stock.location', 'read', [lote],
+      { fields: ['id', 'complete_name', 'usage'] })
+      .forEach(u => { ubic[u.id] = u; });
+  });
+
+  const filasStock = [];
+  const porRef = {};
+  refs.forEach(r => { porRef[r] = { interno: 0, otro: 0, nombre: '' }; });
+  quants.forEach(q => {
+    const ref = refDeVar[stkId_(q.product_id)];
+    if (!ref) return;
+    const u = ubic[stkId_(q.location_id)] || {};
+    const cant = stkNum_(q.quantity);
+    porRef[ref].nombre = nombreDeVar[stkId_(q.product_id)];
+    if (u.usage === 'internal') porRef[ref].interno += cant; else porRef[ref].otro += cant;
+    filasStock.push([ref, nombreDeVar[stkId_(q.product_id)],
+      stkTexto_(u.complete_name), stkTexto_(u.usage),
+      cant, stkNum_(q.reserved_quantity),
+      u.usage === 'internal' ? '' : '← fuera de depósito interno']);
+  });
+  filasStock.sort((a, b) => String(a[0]).localeCompare(String(b[0])) || b[4] - a[4]);
+
+  /* 3. Los ingresos: de dónde vinieron esas cajas. */
+  const metaMov = stkCamposDe_(sesion, 'stock.move');
+  const movs = stkLeerTodo_(sesion, 'stock.move', [
+    ['company_id', '=', empresa.id],
+    ['product_id', 'in', idsVar],
+    ['state', '=', 'done'],
+    ['location_id.usage', 'in', ['supplier', 'inventory', 'production']],
+  ], stkCamposQueExisten_(metaMov,
+    ['id', 'product_id', 'date', 'product_uom_qty', 'quantity', 'reference',
+     'origin', 'picking_id', 'location_id', 'location_dest_id']), 'date asc');
+
+  const filasIng = movs.map(m => {
+    const cant = stkNum_(m.quantity !== undefined ? m.quantity : m.product_uom_qty);
+    const dest = ubic[stkId_(m.location_dest_id)] || {};
+    return [refDeVar[stkId_(m.product_id)] || '', nombreDeVar[stkId_(m.product_id)] || '',
+      String(m.date || '').substring(0, 10), stkTexto_(m.reference), stkTexto_(m.origin),
+      cant, Math.round(cant / 20 * 100) / 100,
+      stkTexto_(dest.complete_name || ''),
+      Math.abs(cant - (faltanPorRef[refDeVar[stkId_(m.product_id)]] || -1)) < 0.01
+        ? '← coincide con lo que falta' : ''];
+  });
+
+  /* 4. El veredicto, referencia por referencia. */
+  const filasRes = refs.map(r => {
+    const x = porRef[r] || { interno: 0, otro: 0, nombre: '' };
+    const falta = faltanPorRef[r];
+    const veredicto = Math.abs(x.otro - falta) < 0.01
+      ? 'ESTÁN: fuera de depósito interno, justo las que faltaban'
+      : x.otro > 0 ? 'hay ' + x.otro + ' fuera de depósito interno, pero no son las ' + falta
+        : 'NO APARECEN en ninguna ubicación → revisar las capas de valorización';
+    return [r, x.nombre, x.interno, x.otro, x.interno + x.otro, falta,
+            Math.round(falta / 20 * 100) / 100, veredicto];
+  });
+
+  stkEscribir_('LOTE SACHETS',
+    ['Referencia', 'Producto', 'En depósito interno', 'En otras ubicaciones', 'Total en Odoo',
+     'Unidades que faltaban', 'Equivale a (cajas de 20)', 'Veredicto'],
+    filasRes, [3, 4, 5, 6, 7]);
+  stkEscribir_('LOTE SACHETS - UBICACIONES',
+    ['Referencia', 'Producto', 'Ubicación', 'Tipo de ubicación', 'Cantidad', 'Reservado', 'Nota'],
+    filasStock, [5, 6]);
+  stkEscribir_('LOTE SACHETS - INGRESOS',
+    ['Referencia', 'Producto', 'Fecha', 'Documento', 'Origen', 'Cantidad',
+     'Cajas de 20', 'Ubicación destino', 'Nota'],
+    filasIng, [6, 7]);
+  stkSS_().setActiveSheet(stkHoja_('LOTE SACHETS'));
+
+  const estan = filasRes.filter(f => String(f[7]).indexOf('ESTÁN') === 0).length;
+  const noEstan = filasRes.filter(f => String(f[7]).indexOf('NO APARECEN') === 0).length;
+  const coinciden = filasIng.filter(f => f[8]).length;
+
+  stkAvisar_('Lote de sachets', [
+    'Referencias revisadas: ' + refs.length,
+    '',
+    'Con las unidades fuera de depósito interno: ' + estan,
+    'Sin rastro en ninguna ubicación: ' + noEstan,
+    'Movimientos de ingreso que coinciden con lo que falta: ' + coinciden,
+    '',
+    estan === refs.length
+      ? 'El stock está bien: las unidades existen pero en ubicaciones que el'
+        + '\nreporte no mira. Hay que moverlas o incluir esa ubicación.'
+      : noEstan === refs.length
+        ? 'Las unidades no existen en ninguna ubicación. Las capas de valorización'
+          + '\ntienen un ingreso que nunca llegó al stock: es contable, no de depósito.'
+        : 'Resultado mixto: mirá la columna Veredicto, fila por fila.',
+    '',
+    'Detalle en las hojas LOTE SACHETS, LOTE SACHETS - UBICACIONES',
+    'y LOTE SACHETS - INGRESOS.',
+  ].join('\n'));
 }
