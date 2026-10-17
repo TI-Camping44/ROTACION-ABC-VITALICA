@@ -1169,6 +1169,11 @@ function stkActualizarDatos() {
       UMBRALES: { min: STK.COBERTURA_MINIMA, max: STK.COBERTURA_MAXIMA },
       MESES: hist.cierres.map(c => c.etiqueta),
       MESES_ROT: STK.MESES_ROTACION,
+      /* Largo REAL de la ventana de ventas, en meses. La ventana arranca el día
+         1 del mes MESES_ROTACION hacia atrás y llega hasta hoy, así que son
+         MESES_ROTACION meses completos MÁS lo que va del mes en curso. Anualizar
+         con 12 / MESES_ROTACION sobreestimaba la rotación hasta un 16%. */
+      MESES_ROT_REAL: stkLargoVentana_(STK.MESES_ROTACION),
       MESES_VENTA: (salidas.mesesVenta || []).map(m => m.etiqueta),
       CAMBIO: cambio,
       STOCK: stock.filas.map(r => ({
@@ -1212,9 +1217,16 @@ function stkActualizarDatos() {
       ventaPorRef[k].q += x.q;
       x.porMes.forEach((q, i) => { ventaPorRef[k].porMes[i] += q; });
       Object.keys(x.porCanal).forEach(c => {
-        if (!ventaPorRef[k].canal[c]) ventaPorRef[k].canal[c] = { q: 0, v: 0 };
+        if (!ventaPorRef[k].canal[c]) {
+          ventaPorRef[k].canal[c] = { q: 0, v: 0, porMes: salidas.mesesVenta.map(() => 0) };
+        }
         ventaPorRef[k].canal[c].q += x.porCanal[c].q;
         ventaPorRef[k].canal[c].v += x.porCanal[c].v;
+        /* La serie mensual del canal también se suma: una misma referencia
+           puede venir de varias variantes. */
+        (x.porCanal[c].porMes || []).forEach((q, i) => {
+          ventaPorRef[k].canal[c].porMes[i] += q;
+        });
       });
     });
 
@@ -1656,9 +1668,15 @@ function stkSalidas_(sesion, empresa, productos, depositos) {
     /* Unidades mes a mes: es lo que Gerencia mira para ver si un producto se
        está muriendo de a poco o vendió todo de golpe en un mes. */
     if (i !== undefined) a.porMes[i] += cantidad;
-    if (!a.porCanal[canal]) a.porCanal[canal] = { q: 0, v: 0 };
+    /* La serie mensual se guarda también por canal. Sin esto, al filtrar por
+       canal el reporte mostraba la suma de ese canal pero las columnas de meses
+       seguían siendo de todos los canales, y dejaban de sumar. */
+    if (!a.porCanal[canal]) {
+      a.porCanal[canal] = { q: 0, v: 0, porMes: mesesVenta.map(() => 0) };
+    }
     a.porCanal[canal].q += cantidad;
     a.porCanal[canal].v += valor;
+    if (i !== undefined) a.porCanal[canal].porMes[i] += cantidad;
 
     const kd = `${p.id}|${deposito}`;
     if (!porDeposito[kd]) {
@@ -1920,10 +1938,21 @@ function stkVerBitacora() {
 
 
 /** Cantidades vendidas por canal, redondeadas, para el reporte. */
+/**
+ * Canales de un artículo, para el reporte.
+ *
+ * Se publica { canal: { q: unidades, m: [serie mensual] } }. Antes era sólo el
+ * número de unidades; el reporte acepta las dos formas, así que un datos.js
+ * viejo sigue funcionando hasta la próxima publicación.
+ */
 function stkCanalesDe_(porCanal) {
   const salida = {};
   Object.keys(porCanal || {}).forEach(c => {
-    salida[c] = Math.round(porCanal[c].q * 100) / 100;
+    const x = porCanal[c] || {};
+    salida[c] = {
+      q: Math.round(stkNum_(x.q) * 100) / 100,
+      m: (x.porMes || []).map(v => Math.round(stkNum_(v) * 100) / 100),
+    };
   });
   return salida;
 }
@@ -2219,6 +2248,17 @@ function stkVisible_(metaCampo, valor) {
   }
   if (Array.isArray(valor)) return valor[1] || '';
   return valor;
+}
+
+/**
+ * Cuántos meses cubre de verdad la ventana de ventas: los meses completos más
+ * la parte transcurrida del mes en curso. Se usa para anualizar la rotación.
+ */
+function stkLargoVentana_(meses) {
+  const hoy = new Date();
+  const diasDelMes = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+  const largo = meses + (hoy.getDate() / diasDelMes);
+  return Math.round(largo * 100) / 100;
 }
 
 function stkMesesAtras_(meses) {
