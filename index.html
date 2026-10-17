@@ -615,7 +615,23 @@ var MESES = DATOS.MESES || [];
 /* Etiquetas de los meses de venta: una columna por mes en los detalles. */
 var MESES_VENTA = DATOS.MESES_VENTA || [];
 var MESES_ROT = DATOS.MESES_ROT || 6;
-var ANUAL = 12 / MESES_ROT;
+/* La ventana de ventas arranca el día 1 del mes MESES_ROT hacia atrás y llega
+   hasta hoy: son MESES_ROT meses completos MÁS lo que va del mes en curso.
+   Anualizar con 12 / MESES_ROT daba de más (hasta un 16% a fin de mes). El
+   generador publica el largo real; si el datos.js es viejo y no lo trae, se
+   usa el valor anterior para no cambiar los números sin aviso. */
+var MESES_ROT_REAL = DATOS.MESES_ROT_REAL || MESES_ROT;
+var ANUAL = 12 / MESES_ROT_REAL;
+
+/* porCanal viene como { canal: unidades } en los datos viejos y como
+   { canal: { q, m } } en los nuevos. Estas dos funciones leen las dos formas. */
+function canalQ(x){ return (x && typeof x === "object") ? (x.q || 0) : (x || 0); }
+function canalMeses(x){ return (x && typeof x === "object" && x.m) ? x.m : null; }
+/* El largo de la ventana, para que el texto de la fórmula diga lo mismo que
+   la cuenta: "6,6 meses" y no "6 meses" cuando el mes en curso va por la mitad. */
+function txtVentana(){
+  return fmt(MESES_ROT_REAL, MESES_ROT_REAL % 1 ? 1 : 0) + " meses";
+}
 var UMB = DATOS.UMBRALES || { min:1, max:6 };
 var NO_COMERCIAL = DATOS.NO_COMERCIAL || [];
 /* Los gimnasios son muestrario: el kit de exhibición que deja Vitalica. Un
@@ -2255,7 +2271,7 @@ function rotacion(){
     : "";
 
   document.getElementById("formula-rot").innerHTML =
-    '<b>Cómo se calcula:</b> <code>rotación = costo de venta ' + MESES_ROT + ' meses × ' +
+    '<b>Cómo se calcula:</b> <code>rotación = costo de venta ' + txtVentana() + ' × ' +
     fmt(ANUAL, ANUAL % 1 ? 1 : 0) + ' ÷ stock promedio</code>. ' +
     'El costo de venta sale de las capas de valorización de Odoo: lo que salió del depósito ' +
     'hacia un cliente, al costo con que estaba registrado. El stock promedio es el promedio ' +
@@ -2304,7 +2320,7 @@ function rotacion(){
 function tituloCanales(porCanal){
   var k = Object.keys(porCanal || {});
   if (!k.length) return "Sin ventas en el período";
-  return k.sort().map(function(c){ return c + ": " + fmtQ(porCanal[c]); }).join(" · ");
+  return k.sort().map(function(c){ return c + ": " + fmtQ(canalQ(porCanal[c])); }).join(" · ");
 }
 
 /**
@@ -2379,7 +2395,7 @@ function rotacionArticulos(){
   if (!fam || esTodas(fam) || comparando) { sec.hidden = true; return; }
 
   document.getElementById("formula-rot-art").innerHTML =
-    '<b>Cómo se calcula:</b> <code>rotación = unidades vendidas ' + MESES_ROT + ' meses × ' +
+    '<b>Cómo se calcula:</b> <code>rotación = unidades vendidas ' + txtVentana() + ' × ' +
     fmt(ANUAL, ANUAL % 1 ? 1 : 0) + ' ÷ unidades en stock</code>, en todos los depósitos juntos. ' +
     'Se mide en <b>unidades</b>: para un artículo es más directo de leer. El denominador es ' +
     'el stock de hoy y no un promedio: sirve para comparar artículos entre sí dentro de la familia. ' +
@@ -2392,9 +2408,12 @@ function rotacionArticulos(){
     .map(function(a){
       /* Con un canal elegido, las unidades vendidas son solo las de ese canal. */
       var porCanal = a[8] || {};
-      var qv = canal === "*" ? (a[5] || 0) : (porCanal[canal] || 0);
+      var qv = canal === "*" ? (a[5] || 0) : canalQ(porCanal[canal]);
       var qs = a[6] || 0;
-      var meses = a[9] || [];
+      /* Con un canal elegido, las columnas de meses tienen que ser las de ESE
+         canal. Antes quedaban las de todos y dejaban de sumar la columna
+         "Suma vendidas", que sí se filtraba. */
+      var meses = (canal === "*" ? a[9] : canalMeses(porCanal[canal])) || a[9] || [];
       var fila = [a[0], a[1], a[2], a[3], a[4], qv, qs, a[7] || "",
                   qs > 0 ? qv * ANUAL / qs : 0, porCanal, meses];
       MESES_VENTA.forEach(function(_, i){ fila[11 + i] = meses[i] || 0; });
