@@ -58,6 +58,22 @@ header.top{background:var(--paper); border-top:4px solid var(--brand)}
 .fijo.compacto .mini-logo{display:block}
 .tabs-fila{max-width:1260px; margin:0 auto; padding:0 20px; display:flex; align-items:flex-end}
 .tabs-fila .tabs{padding-left:0; padding-right:0; flex:1}
+
+/* ---------- selector de empresa ----------
+   El mismo de los informes de ventas: se ve en qué empresa se está y se
+   cambia de un clic. Acá el punto es naranja porque es el de Vitálica; en el
+   reporte de Camping 44 es verde. La letra va en 11,5 px y no en 10,5 como
+   en ventas, para respetar el mínimo de legibilidad de este reporte. */
+.sw-empresa{display:flex; background:#262a31; border-radius:8px; padding:3px; gap:3px;
+            align-self:center; margin:0 0 0 12px; flex:0 0 auto}
+.sw-empresa a{text-align:center; font-family:var(--body); font-size:11.5px; font-weight:700;
+              letter-spacing:.2px; padding:5px 12px; border-radius:6px; color:#c3cad4;
+              text-decoration:none; white-space:nowrap}
+.sw-empresa a:hover{color:#fff; background:#3a4150}
+.sw-empresa a:focus-visible{outline:2px solid var(--brand); outline-offset:1px}
+.sw-empresa a.on{background:#454d5c; color:#fff; cursor:default}
+.sw-empresa a.on::before{content:"●"; font-size:8px; vertical-align:2px; margin-right:5px; color:#f07d20}
+.sw-empresa a.on:hover{background:#454d5c}
 /* Filtros y filtros activos van DENTRO del encabezado: se apilan solos y
    no hace falta calcular alturas con JavaScript. */
 .barra{max-width:1260px; margin:0 auto; padding:0 20px 8px}
@@ -366,6 +382,9 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
   .top-in, .tabs-fila, .barra, .fijo .barra{padding-left:16px; padding-right:16px}
   .kpis{grid-template-columns:1fr}
   .tab{padding:7px 10px 6px; font-size:12.5px}
+  .tabs-fila{flex-wrap:wrap}
+  .sw-empresa{order:-1; flex:1 1 100%; margin:8px 0 0}
+  .sw-empresa a{flex:1}
   .shead h2{font-size:16px; white-space:normal}
   .shead .note{display:none}
 }
@@ -404,6 +423,11 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
       <button class="tab" role="tab" id="t1" aria-controls="p1" aria-selected="true">Parte 1 · Situación actual</button>
       <button class="tab" role="tab" id="t2" aria-controls="p2" aria-selected="false">Parte 2 · Histórico y rotación</button>
     </div>
+    <!-- Selector de empresa: se ve cuál está abierta y se cambia de un clic. -->
+    <nav class="sw-empresa" aria-label="Empresa">
+      <a href="https://ti-camping44.github.io/ROTACIONABC/" title="Ir al stock de Camping 44">Camping 44</a>
+      <a class="on" aria-current="page" title="Estás en el stock de Vitálica">Vitálica</a>
+    </nav>
   </div>
   <div class="barra">
     <div class="filters">
