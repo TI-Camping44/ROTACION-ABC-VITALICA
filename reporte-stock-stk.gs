@@ -122,7 +122,7 @@ const STK = Object.freeze({
     { grupo: 'Gimnasios RM',   codigos: ['RMLAM'] },
     { grupo: 'Gimnasios BIGG', codigos: ['BLPER', 'BCENT', 'BSEIF', 'BHERR'] },
     { grupo: 'Gimnasios GTC',  codigos: ['GTFZS', 'GTACN', 'GTCGR', 'GTFDM', 'GTLAM',
-                                         'GTLOM', 'GTLUQ', 'GTMCA', 'GTCVE'] },
+                                         'GTLOM', 'GTLUQ', 'GTMCA', 'GTCVE', 'GTCGP'] },
   ]),
   GRUPO_DEFECTO: 'Otros',
   /* Grupo de las ubicaciones no comerciales que no cuelgan de ningún almacén
@@ -137,7 +137,7 @@ const STK = Object.freeze({
   DEPOSITOS_MUESTRARIO: Object.freeze([
     'RMLAM',
     'BLPER', 'BCENT', 'BSEIF', 'BHERR',
-    'GTFZS', 'GTACN', 'GTCGR', 'GTFDM', 'GTLAM', 'GTLOM', 'GTLUQ', 'GTMCA', 'GTCVE',
+    'GTFZS', 'GTACN', 'GTCGR', 'GTFDM', 'GTLAM', 'GTLOM', 'GTLUQ', 'GTMCA', 'GTCVE', 'GTCGP',
   ]),
 
   /* Depósitos de ABASTECIMIENTO: guardan la reserva que repone a los que
@@ -1482,7 +1482,9 @@ function stkDepositos_(sesion, empresa) {
     const raiz = (ruta.split('/')[0] || '').trim();
     const cod = alm ? alm.cod : raiz;
     const base = alm ? (alm.nombre || alm.cod) : (raiz || 'Sin depósito');
-    const tramo = stkTramoNoComercial_(ruta);
+    /* No comercial por una ubicación dentro de la ruta o por el nombre del
+       propio almacén (en Odoo apareció un almacén "Exhibición", EXHI). */
+    const tramo = stkTramoNoComercial_(ruta) || stkTramoNoComercial_(base);
     const nombre = tramo || base;
 
     porUbicacion[u.id] = nombre;
