@@ -1,0 +1,139 @@
+{
+  "_comentario": "Configuración del reporte de stock de Vitálica. El script la lee en cada corrida: lo que se cambie acá vale desde la próxima actualización, sin tocar Apps Script. Las claves que empiezan con _ son comentarios. Si este archivo falta o tiene un error, el script usa los valores escritos en el código y lo avisa.",
+  "NORMA": "",
+  "VALORIZAR_CON": "quant",
+  "MESES_HISTORICO": 18,
+  "MESES_ROTACION": 6,
+  "_GRUPOS_DEPOSITO": "Grupos del reporte, por código de almacén de Odoo (el campo code). El orden de la lista es el orden en pantalla. Un almacén que no figure cae en GRUPO_DEFECTO.",
+  "GRUPOS_DEPOSITO": [
+    {
+      "grupo": "Propios",
+      "codigos": [
+        "VI-CC",
+        "MGLOG",
+        "VI-SH",
+        "VI-EX"
+      ]
+    },
+    {
+      "grupo": "Gimnasios RM",
+      "codigos": [
+        "RMLAM"
+      ]
+    },
+    {
+      "grupo": "Gimnasios BIGG",
+      "codigos": [
+        "BLPER",
+        "BCENT",
+        "BSEIF",
+        "BHERR"
+      ]
+    },
+    {
+      "grupo": "Gimnasios GTC",
+      "codigos": [
+        "GTFZS",
+        "GTACN",
+        "GTCGR",
+        "GTFDM",
+        "GTLAM",
+        "GTLOM",
+        "GTLUQ",
+        "GTMCA",
+        "GTCVE",
+        "GTCGP"
+      ]
+    }
+  ],
+  "GRUPO_DEFECTO": "Otros",
+  "GRUPO_NO_COMERCIAL": "No comerciales",
+  "_DEPOSITOS_MUESTRARIO": "Gimnasios con el kit de exhibición: suman al stock pero no llevan estado de reposición.",
+  "DEPOSITOS_MUESTRARIO": [
+    "RMLAM",
+    "BLPER",
+    "BCENT",
+    "BSEIF",
+    "BHERR",
+    "GTFZS",
+    "GTACN",
+    "GTCGR",
+    "GTFDM",
+    "GTLAM",
+    "GTLOM",
+    "GTLUQ",
+    "GTMCA",
+    "GTCVE",
+    "GTCGP"
+  ],
+  "_DEPOSITOS_ABASTECIMIENTO": "Depósitos que reponen a los que venden (Megalog): su cobertura se mide contra la venta de toda la empresa.",
+  "DEPOSITOS_ABASTECIMIENTO": [
+    "MGLOG"
+  ],
+  "_DEPOSITOS_NO_COMERCIALES": "Texto que, si aparece en el nombre del almacén o de una ubicación, la marca como no comercial (exhibición, marketing). Por coincidencia parcial, sin acentos ni mayúsculas.",
+  "DEPOSITOS_NO_COMERCIALES": [
+    "Exhibición",
+    "Marketing"
+  ],
+  "COBERTURA_MINIMA": 1,
+  "COBERTURA_MAXIMA": 6,
+  "CANAL_DEFECTO": "Sin canal",
+  "CANALES_POR_EQUIPO": {},
+  "_CANALES_POR_LISTA": "Canal según el comienzo del nombre de la lista de precios del cliente, sin espacios ni signos. MAPEO PROVISORIO.",
+  "CANALES_POR_LISTA": [
+    {
+      "canal": "Consumidor final",
+      "claves": [
+        "PUBLICO",
+        "RETAIL",
+        "PROMO"
+      ]
+    },
+    {
+      "canal": "Embajadores",
+      "claves": [
+        "EMBAJADOR"
+      ]
+    },
+    {
+      "canal": "Distribución",
+      "claves": [
+        "DIST",
+        "CONGS"
+      ]
+    },
+    {
+      "canal": "Exterior",
+      "claves": [
+        "EXT"
+      ]
+    }
+  ],
+  "_FAMILIAS_UNIFICADAS": "Categorías de Odoo que se juntan en una sola familia. Cada categoría es el final de su ruta, con \" / \" entre tramos.",
+  "FAMILIAS_UNIFICADAS": [
+    {
+      "familia": "Proteínas",
+      "linea": "Suplementos",
+      "categorias": [
+        "Suplementos (Padre) / Proteínas",
+        "Proteína",
+        "Proteína / VITALICA"
+      ]
+    }
+  ],
+  "LINEA_DEFECTO": "Otros productos",
+  "PRODUCTOS_EXCLUIDOS": [],
+  "CATEGORIAS_EXCLUIDAS": [
+    "NO USAR",
+    "Ajustes",
+    "Descuento",
+    "Anticipo de Cliente",
+    "Gastos de Importación (Landed Cost)",
+    "Intereses",
+    "Servicios",
+    "DESCUENTOS COMERCIALES",
+    "Expenses",
+    "Impuestos no capitalizables",
+    "IVA Despacho"
+  ]
+}

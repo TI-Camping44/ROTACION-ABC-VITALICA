@@ -54,3 +54,25 @@ lectura de listas de precios con las dos empresas en el contexto y
   Vitalica.
 - **Repo público.** Se decidió dejarlo público: `datos.js` expone stock,
   valores por depósito y nombres de productos.
+
+## Configuración sin tocar el código
+
+Lo que cambia con el negocio vive en **`config.json`**, en la raíz de este
+repo. El script lo lee en cada corrida: lo que se cambie ahí vale desde la
+próxima actualización, **sin volver a pegar el código en Apps Script**.
+
+- Grupos de depósitos por código de almacén (`GRUPOS_DEPOSITO`).
+- Gimnasios que son muestrario (`DEPOSITOS_MUESTRARIO`).
+- Depósitos de abastecimiento, como Megalog (`DEPOSITOS_ABASTECIMIENTO`).
+- Ubicaciones no comerciales (`DEPOSITOS_NO_COMERCIALES`).
+- Familias unificadas, categorías excluidas, canales, umbrales de cobertura,
+  valorización y meses de histórico.
+
+Ejemplo: cuando aparece un gimnasio nuevo en Odoo, se agrega su código al grupo
+que corresponda en `GRUPOS_DEPOSITO` y, si es muestrario, a
+`DEPOSITOS_MUESTRARIO`.
+
+La empresa, la conexión con Odoo y la publicación **no** se pueden cambiar
+desde ese archivo. Si falta o tiene un error, el script usa los valores
+escritos en el código y lo avisa al terminar la corrida, en la línea
+"Configuración". El diagnóstico muestra lo mismo en la hoja DIAGNOSTICO.
