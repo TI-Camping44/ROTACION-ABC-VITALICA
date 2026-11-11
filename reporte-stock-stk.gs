@@ -63,7 +63,10 @@ function stkInstalarMenu() {
 }
 
 
-const STK = Object.freeze({
+/* Valores por defecto. Los que figuran en STK_CONFIGURABLES se pueden
+   cambiar sin tocar el código, desde config.json en el repositorio (ver
+   stkCargarConfig_). Si ese archivo no se puede leer, rigen estos. */
+const STK_BASE = Object.freeze({
   ZONA_HORARIA: 'America/Asuncion',
 
   /* Empresa del reporte, tal como figura en Odoo (búsqueda parcial). */
@@ -217,6 +220,88 @@ const STK = Object.freeze({
   }),
 });
 
+/* La configuración vigente: STK_BASE con lo que diga config.json encima.
+   Es var y no const porque stkCargarConfig_ la reemplaza al conectarse. */
+var STK = STK_BASE;
+
+
+/* ==========================================================================
+   CONFIGURACIÓN DESDE EL REPOSITORIO
+   ==========================================================================
+   Lo que cambia con el negocio (un gimnasio nuevo, un almacén que pasa a ser
+   de exhibición, el mapeo de canales) vive en config.json, en la raíz del
+   repositorio del reporte. El script lo lee en cada corrida: para cambiar
+   esas listas alcanza con editar el archivo en GitHub, sin volver a pegar
+   el código acá.
+
+   Solo se aceptan las claves de STK_CONFIGURABLES, con el mismo tipo que el
+   valor por defecto. La conexión con Odoo, la empresa y la publicación NO se
+   pueden cambiar desde el archivo. Las claves que empiezan con "_" son
+   comentarios y se ignoran.
+   ========================================================================== */
+
+const STK_CONFIGURABLES = Object.freeze([
+  'NORMA', 'VALORIZAR_CON', 'MESES_HISTORICO', 'MESES_ROTACION',
+  'GRUPOS_DEPOSITO', 'GRUPO_DEFECTO', 'GRUPO_NO_COMERCIAL',
+  'DEPOSITOS_MUESTRARIO', 'DEPOSITOS_ABASTECIMIENTO', 'DEPOSITOS_NO_COMERCIALES',
+  'COBERTURA_MINIMA', 'COBERTURA_MAXIMA',
+  'CANAL_DEFECTO', 'CANALES_POR_EQUIPO', 'CANALES_POR_LISTA',
+  'FAMILIAS_UNIFICADAS', 'LINEA_DEFECTO',
+  'PRODUCTOS_EXCLUIDOS', 'CATEGORIAS_EXCLUIDAS',
+]);
+
+/* De dónde salió la configuración de esta corrida, para el diagnóstico. */
+var STK_CONFIG_ORIGEN = 'valores del código';
+var STK_CONFIG_CARGADA = false;
+
+function stkTipoValor_(v) {
+  if (Array.isArray(v)) return 'lista';
+  return v === null ? 'nulo' : typeof v;
+}
+
+function stkCongelar_(v) {
+  if (v && typeof v === 'object') {
+    Object.keys(v).forEach(k => stkCongelar_(v[k]));
+    Object.freeze(v);
+  }
+  return v;
+}
+
+/**
+ * Lee config.json del repositorio y lo aplica sobre STK_BASE. Una vez por
+ * ejecución. Nunca corta la corrida: si el archivo falta o está mal, se
+ * usan los valores del código y queda anotado para el aviso final.
+ */
+function stkCargarConfig_() {
+  if (STK_CONFIG_CARGADA) return;
+  STK_CONFIG_CARGADA = true;
+  const url = `https://raw.githubusercontent.com/${STK_BASE.GITHUB_OWNER}/${STK_BASE.GITHUB_REPO}/` +
+              `${STK_BASE.GITHUB_RAMA}/config.json?t=${Date.now()}`;
+  let crudo;
+  try {
+    const r = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (r.getResponseCode() !== 200) throw new Error(`HTTP ${r.getResponseCode()}`);
+    crudo = JSON.parse(r.getContentText());
+  } catch (e) {
+    STK_CONFIG_ORIGEN = 'valores del código (no se pudo leer config.json: ' + (e.message || e) + ')';
+    STK_SIN_PERMISO.push('config.json del repositorio — se usaron los valores del código');
+    return;
+  }
+
+  const cambios = {};
+  const ignoradas = [];
+  Object.keys(crudo || {}).forEach(k => {
+    if (k.charAt(0) === '_') return;
+    if (STK_CONFIGURABLES.indexOf(k) < 0) { ignoradas.push(k); return; }
+    if (stkTipoValor_(crudo[k]) !== stkTipoValor_(STK_BASE[k])) { ignoradas.push(k + ' (tipo)'); return; }
+    cambios[k] = stkCongelar_(crudo[k]);
+  });
+  STK = Object.freeze(Object.assign({}, STK_BASE, cambios));
+  STK_CONFIG_ORIGEN = 'config.json del repositorio (' + Object.keys(cambios).length + ' valores)' +
+    (ignoradas.length ? ' · ignoradas: ' + ignoradas.join(', ') : '');
+  if (ignoradas.length) Logger.log('config.json: claves ignoradas: ' + ignoradas.join(', '));
+}
+
 
 function stkMenu() {
   let ui;
@@ -349,6 +434,7 @@ function stkEmpresa_(sesion) {
 
 /** Sesión abierta y fijada en la empresa del reporte. */
 function stkConectar_() {
+  stkCargarConfig_();
   const sesion = stkSesion_();
   const empresa = stkEmpresa_(sesion);
   sesion.companyIds = [empresa.id];
@@ -493,6 +579,7 @@ function stkDiagnosticar() {
 
   const filas = [
     ['Empresa', `${empresa.name} [${empresa.id}]`],
+    ['Configuración', STK_CONFIG_ORIGEN],
     ['', ''],
     ['Capas de valorización', capas],
     ['Capa más antigua', primeraCapa || 'ninguna'],
@@ -1256,6 +1343,7 @@ function stkActualizarDatos() {
       `Líneas de venta: ${salidas.lineas}`,
       `Familias con histórico: ${hist.filasFam.length}`,
       `Valorizado con: ${stkNombreModo_(stock.modo)}`,
+      `Configuración: ${STK_CONFIG_ORIGEN}`,
       '',
       stock.modo === 'costo' && stock.total === 0 && stock.unidades > 0
         ? 'ATENCIÓN: el stock da Gs. 0. El costo de la ficha está en cero: ' +
