@@ -765,6 +765,14 @@ var canal = "*";
 var estadoActivo = "*";
 
 var esNoComercial = function(d){ return NO_COMERCIAL.indexOf(d) >= 0; };
+/* "Sin depósito" junta lo que salió hacia un cliente desde una ubicación que
+   no es depósito (un ajuste, un tránsito). Sin stock no hay nada que mirar
+   como depósito: no se muestra como fila ni como opción, pero su venta sigue
+   sumando en el total. Si algún día tiene stock, vuelve a aparecer. */
+var OCULTAR_DEP = {};
+if (!STOCK.some(function(r){ return r.dep === "Sin depósito" && (r.q > 0 || r.v > 0); })) {
+  OCULTAR_DEP["Sin depósito"] = true;
+}
 var esMuestrario = function(d){ return MUESTRARIO.indexOf(d) >= 0; };
 /* Línea de cada familia: el nivel de arriba en el árbol de categorías de
    Odoo (Suplementos, Otros productos). Un datos.js anterior no la trae y
@@ -1034,7 +1042,7 @@ function depositosOrdenados(){
   var peso = {};
   Object.keys(DEPOS).forEach(function(d){ peso[d] = 0; });
   STOCK.forEach(function(r){ peso[r.dep] = (peso[r.dep]||0) + r.v; });
-  return Object.keys(peso).sort(function(a,b){
+  return Object.keys(peso).filter(function(d){ return !OCULTAR_DEP[d]; }).sort(function(a,b){
     return ordenGrupo(grupoDe(a)) - ordenGrupo(grupoDe(b)) || peso[b] - peso[a];
   });
 }
@@ -1625,6 +1633,8 @@ function celdasResumen(x, T){
 
 function tablaDepositos(T){
   var filas = resumenDepositos();
+  var ocultas = filas.filter(function(x){ return OCULTAR_DEP[x.k]; });
+  filas = filas.filter(function(x){ return !OCULTAR_DEP[x.k]; });
   var tb = document.querySelector("#tbl-dep tbody"), tf = document.querySelector("#tbl-dep tfoot");
   document.getElementById("th-vendidas").textContent = "Vendidas " + MESES_ROT + "m";
   document.getElementById("nota-dep").textContent =
@@ -1655,6 +1665,11 @@ function tablaDepositos(T){
   var grupos = {};
   filas.forEach(function(x){ (grupos[x.grp] = grupos[x.grp] || []).push(x); });
   var total = nuevoResumen("Total");
+  /* Lo vendido desde ubicaciones ocultas sigue contando en el total. */
+  ocultas.forEach(function(x){
+    total.qv += x.qv; total.vv += x.vv;
+    if (x.ult > total.ult) total.ult = x.ult;
+  });
   var html = Object.keys(grupos)
     .sort(function(a,b){ return ordenGrupo(a) - ordenGrupo(b); })
     .map(function(g){
@@ -1724,7 +1739,7 @@ var R_REF=0, R_NOM=1, R_FAM=2, R_DEP=3, R_CAT=4, R_QS=5, R_VS=6, R_QV=7, R_VV=8,
 function filasRotDep(conEstado){
   var q = (document.getElementById("q-dep").value || "").trim().toLowerCase();
   return ROT_DEP.filter(function(a){
-    if (!pasaDep(a[R_DEP])) return false;
+    if (OCULTAR_DEP[a[R_DEP]] || !pasaDep(a[R_DEP])) return false;
     if (!pasaFam(a[R_FAM])) return false;
     if (f.cat !== "*" && a[R_CAT] !== f.cat) return false;
     if (q && (a[R_NOM] + " " + a[R_REF]).toLowerCase().indexOf(q) < 0) return false;
