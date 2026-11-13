@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#FFFFFF">
 <title>Reporte de Stock y Rotación · Vitalica</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,6 +18,7 @@
   /* Todos los textos pasan 4,5:1 de contraste (WCAG AA) sobre cualquiera de
      los fondos del reporte, incluidas las filas resaltadas en naranja. */
   --ink:#2E2A27; --ink2:#525252; --muted:#6B625A;
+  color-scheme:light;
   --paper:#FFFFFF; --bg:#F5F1EC; --line:#E6DDD3; --line2:#F0EAE3;
   /* Semáforo: A rota bien, C hay que liquidarla. N es nuevo y por eso queda
      fuera de la escala, en azul. Los tonos están bajados respecto del verde,
@@ -272,7 +274,7 @@ tr.dep td:first-child{padding-left:20px}
 .pie:hover{border-color:var(--brand)}
 .pie:focus-visible{outline:2px solid var(--brand-dk); outline-offset:2px}
 .pie.on{border-color:var(--brand); box-shadow:inset 0 0 0 1px var(--brand)}
-.pie h4{font-family:var(--disp); font-size:14px; text-transform:uppercase; letter-spacing:.05em; margin:0 0 1px; font-weight:600}
+.pie h3{font-family:var(--disp); font-size:14px; text-transform:uppercase; letter-spacing:.05em; margin:0 0 1px; font-weight:600}
 .pie .tot{font-family:var(--mono); font-size:11.5px; color:var(--muted); margin-bottom:8px}
 .pie .mini{display:flex; gap:3px; justify-content:center; margin-top:9px; flex-wrap:wrap}
 .pie .mini b{font-family:var(--mono); font-size:11px; font-weight:500; padding:1px 5px; border-radius:2px; color:#fff}
@@ -282,11 +284,12 @@ tr.dep td:first-child{padding-left:20px}
 .leyenda-serie{
   display:flex; gap:8px 16px; flex-wrap:wrap; margin:12px 0 0; font-size:12px;
 }
-.leyenda-serie > span{
+.leyenda-serie > button{
+  font:inherit; color:inherit; 
   display:inline-flex; align-items:center; gap:6px; cursor:pointer;
   padding:2px 8px; border:1px solid var(--line2); border-radius:20px; background:#FFFCF9;
 }
-.leyenda-serie > span:hover{border-color:var(--brand); background:#fff}
+.leyenda-serie > button:hover{border-color:var(--brand); background:#fff}
 .leyenda-serie i{width:16px; height:3px; border-radius:2px; display:inline-block; flex:0 0 16px}
 
 /* ---------- estado de reposición ----------
@@ -391,15 +394,40 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
 @media (prefers-reduced-motion:no-preference){
   .slice{transition:opacity .15s}
 }
+
+/* ---------- accesibilidad ----------
+   .btn-cel es el botón real que se pone dentro de lo que responde al clic
+   (la celda del nombre de una fila, el título de una torta o de una
+   sección). Se ve igual que antes; suma teclado y lector de pantalla. */
+.btn-cel{appearance:none; background:none; border:0; padding:0; margin:0; font:inherit; color:inherit;
+         letter-spacing:inherit; text-transform:inherit; text-align:inherit; line-height:inherit; cursor:pointer}
+.btn-cel:focus-visible, th.ord:focus-visible, th.sel:focus-visible, .leyenda-serie > button:focus-visible,
+.kpi button.ver:focus-visible, .mini-logo:focus-visible{outline:2px solid var(--brand-dk); outline-offset:2px; border-radius:2px}
+.shead h2 > .btn-cel{display:inline-flex; align-items:baseline; gap:12px}
+li > .btn-cel{display:flex; align-items:center; gap:7px; width:100%}
+td > .btn-cel{display:block; width:100%}
+.kpi button.ver{background:none; border:0; border-bottom:1px solid transparent; padding:0; font:inherit;
+                font-size:11px; letter-spacing:.1em; text-transform:uppercase; cursor:pointer}
+.saltar{position:absolute; left:-9999px; top:8px; z-index:200; background:#fff; color:var(--ink);
+        padding:8px 14px; border:2px solid var(--brand-dk); border-radius:4px; font-weight:600; text-decoration:none}
+.saltar:focus{left:16px}
+main:focus{outline:none}
+h1, h2, h3{text-wrap:balance}
+body{-webkit-tap-highlight-color:rgba(0,0,0,.08)}
+button, a, select, input, .chip, .tab, th.ord, th.sel, .mark, .pie, tr[data-dep], tr[data-fam]{touch-action:manipulation}
+@media (prefers-reduced-motion:reduce){
+  *, *::before, *::after{transition:none !important; animation:none !important; scroll-behavior:auto !important}
+}
 </style>
 </head>
 <body>
+<a class="saltar" href="#contenido">Saltar al contenido</a>
 
 <header class="top">
   <div class="top-in">
     <div class="mark" id="ir-inicio" role="button" tabindex="0"
          title="Volver al inicio y quitar todos los filtros">
-      <img src="logo-vitalica.png" alt="Vitalica"
+      <img src="logo-vitalica.png" alt="Vitalica" width="63" height="46" fetchpriority="high"
            onerror="this.outerHTML='&lt;span class=\'fallback\'&gt;V&lt;/span&gt;'">
     </div>
     <div class="ttl">
@@ -415,9 +443,9 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
   </div>
 </header>
 
-<div class="fijo" id="fijo">
+<div class="fijo" id="fijo" role="region" aria-label="Pestañas y filtros">
   <div class="tabs-fila">
-    <img src="logo-vitalica.png" alt="Vitalica" class="mini-logo" id="mini-logo"
+    <img src="logo-vitalica.png" alt="Vitalica" class="mini-logo" id="mini-logo" width="30" height="22" role="button" tabindex="0"
          title="Volver al inicio y quitar todos los filtros" onerror="this.style.display='none'">
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="t1" aria-controls="p1" aria-selected="true">Parte 1 · Situación actual</button>
@@ -441,7 +469,7 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
   </div>
 </div>
 
-<div class="wrap">
+<main class="wrap" id="contenido" tabindex="-1">
 
   <div id="p1" role="tabpanel" aria-labelledby="t1">
     <section><div class="kpis" id="kpis"></div>
@@ -477,8 +505,8 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
         <div class="chips" id="f-est" role="group" aria-label="Estado"></div>
         <div class="buscador">
           <label for="q-dep">Buscar</label>
-          <input type="search" id="q-dep" placeholder="referencia o parte del nombre del producto…">
-          <span class="count" id="q-dep-n"></span>
+          <input type="search" id="q-dep" spellcheck="false" autocomplete="off" placeholder="referencia o parte del nombre del producto…">
+          <span class="count" aria-live="polite" id="q-dep-n"></span>
           <button class="clear" id="rotdep-csv">descargar lista</button>
         </div>
         <div class="scroll"><table id="tbl-rotdep">
@@ -510,9 +538,9 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
         <div class="note" id="nota-art"></div></div>
       <div class="card">
         <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px">
-          <input type="search" id="q-art" placeholder="Buscar artículo o referencia…"
+          <input type="search" id="q-art" aria-label="Buscar artículo o referencia" spellcheck="false" autocomplete="off" placeholder="Buscar artículo o referencia…"
                  style="font-family:var(--mono);font-size:12.5px;padding:5px 9px;border:1px solid var(--line);border-radius:2px;background:#FFFCF9;min-width:230px">
-          <span class="count" id="q-art-n"></span>
+          <span class="count" aria-live="polite" id="q-art-n"></span>
           <button class="clear" id="art-csv">descargar lista</button>
         </div>
         <p class="nota-cat" id="aviso-cat" hidden></p>
@@ -590,9 +618,9 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
         <p class="formula" style="margin-top:0" id="formula-rot-art"></p>
         <div class="buscador">
           <label for="q-rot-art">Buscar</label>
-          <input type="search" id="q-rot-art"
+          <input type="search" id="q-rot-art" spellcheck="false" autocomplete="off"
                  placeholder="referencia interna o parte del nombre del producto…">
-          <span class="count" id="q-rot-art-n"></span>
+          <span class="count" aria-live="polite" id="q-rot-art-n"></span>
         </div>
         <p class="nota-cat" id="rot-art-otras" hidden></p>
         <div class="scroll"><table id="tbl-rot-art">
@@ -603,7 +631,7 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
   </div>
 
   <footer id="pie"></footer>
-</div>
+</main>
 <!-- El archivo de datos se pide con la hora pegada al nombre. Sin eso, el
      navegador y el CDN de GitHub Pages guardan el datos.js viejo y el reporte
      sigue mostrando las cifras de ayer aunque la planilla ya haya publicado
@@ -616,6 +644,69 @@ td.nom .subfam b{color:var(--ink2); font-weight:600}
 <script>
 (function(){
 "use strict";
+
+/* Movimiento: los desplazamientos suaves respetan "reducir movimiento". */
+var MOV = (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) ? "auto" : "smooth";
+
+/* Al activar uno de estos botones la tabla se vuelve a dibujar; esto
+   devuelve el foco al botón equivalente para no perder el lugar. */
+var focoPendiente = null;
+var HOSTS = "[data-dep],[data-grp],[data-fam],[data-lin],[data-cal],[data-marca],[data-clave],[data-ctl]";
+function claveHost(el){
+  if (!el) return "";
+  return Array.prototype.map.call(el.attributes, function(a){
+    return a.name.indexOf("data-") === 0 ? a.name + "=" + a.value : "";
+  }).join("|") + "|" + el.tagName;
+}
+document.addEventListener("click", function(e){
+  var b = e.target.closest && e.target.closest(".btn-cel");
+  if (!b) return;
+  focoPendiente = claveHost(b.parentElement.closest(HOSTS));
+  setTimeout(function(){ focoPendiente = null; }, 0);
+}, true);
+
+/**
+ * Pone un <button> real dentro de un elemento que responde al clic (la
+ * celda del nombre de una fila, el título de una torta o de una sección).
+ * El clic del mouse sigue llegando al contenedor como antes; el botón suma
+ * lo que faltaba: se alcanza con Tab, se activa con Enter o Espacio y un
+ * lector de pantalla lo anuncia como botón sin borrar el título ni la celda.
+ */
+function botonDentro(el, titulo, presionado){
+  if (!el) return null;
+  var ya = el.querySelector(":scope > .btn-cel");
+  if (ya) return ya;
+  var b = document.createElement("button");
+  b.type = "button";
+  b.className = "btn-cel";
+  if (titulo) b.title = titulo;
+  if (presionado !== undefined) b.setAttribute("aria-pressed", String(Boolean(presionado)));
+  while (el.firstChild) b.appendChild(el.firstChild);
+  el.appendChild(b);
+  if (focoPendiente && claveHost(el.closest(HOSTS)) === focoPendiente) {
+    b.focus({ preventScroll:true });
+    focoPendiente = null;
+  }
+  return b;
+}
+
+/* Si la fila es la elegida en los filtros (o está resaltada), su botón
+   queda como presionado. */
+function filaElegida(tr){
+  var d = tr.dataset;
+  var porFiltro = ["dep", "grp", "lin", "fam", "cal", "marca"].some(function(k){
+    return d[k] !== undefined && typeof f !== "undefined" && f[k] === d[k];
+  });
+  return porFiltro || tr.classList.contains("sel-fila") || tr.classList.contains("on");
+}
+
+/* Descripción de una torta para lectores de pantalla. */
+function etiquetaTorta(nombre, vals){
+  var t = vals.reduce(function(a,b){ return a + b.v; }, 0);
+  var partes = vals.filter(function(x){ return x.v > 0; })
+    .map(function(x){ return x.lab + " " + pct(x.v, t); });
+  return (nombre ? nombre + ": " : "") + partes.join(", ");
+}
 
 if (typeof DATOS === "undefined" || !DATOS.STOCK) {
   document.querySelector(".wrap").innerHTML =
@@ -701,10 +792,11 @@ var gsM = function(n){ return "Gs. " + fmt(n, Math.abs(n) < 100 ? 1 : 0) + " M";
 var gs = function(n){ return fmt(Math.round((n||0) * 1000000)); };
 var pct = function(n,t){ return t ? (n/t*100).toFixed(1).replace(".",",") + "%" : "0%"; };
 var esc = function(s){ return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); };
+var FMT_FECHA = new Intl.DateTimeFormat("es-PY", { day:"2-digit", month:"2-digit", year:"2-digit", timeZone:"UTC" });
 var fecha = function(iso){
   if (!iso) return "";
-  var p = String(iso).split("-");
-  return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0].slice(-2) : iso;
+  var d = new Date(String(iso).slice(0, 10) + "T00:00:00Z");
+  return isNaN(d) ? String(iso) : FMT_FECHA.format(d);
 };
 var vacio = { A:0,B:0,C:0,N:0,NC:0 };
 var CLAVES = ["A","B","C","N","NC"];
@@ -760,6 +852,8 @@ var orden_filtros = [];
 /* Orden de cada tabla: columna y sentido. */
 var orden = { dep:{k:"vs", asc:false}, rd:{k:"pri", asc:true}, fam:{k:"_t", asc:false},
               art:{k:6, asc:false}, rot:{k:"cmv", asc:false}, rota:{k:5, asc:false} };
+var ORDEN_INICIAL = {};
+Object.keys(orden).forEach(function(k){ ORDEN_INICIAL[k] = JSON.stringify(orden[k]); });
 
 /** Ordena filas por una clave, con texto e números tratados distinto. */
 function ordenar(filas, k, asc){
@@ -824,17 +918,17 @@ var valores = function(x){ return CATS.map(function(c){ return {v:x[c.k]||0, col
 var DEFS = '<defs><pattern id="hatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">'+
   '<rect width="6" height="6" fill="#DCD6C8"/><line x1="0" y1="0" x2="0" y2="6" stroke="#8C7A57" stroke-width="2.4"/></pattern></defs>';
 
-function donut(vals, size, thick){
+function donut(vals, size, thick, nombre){
   var t = vals.reduce(function(a,b){return a+b.v;},0);
   var r = size/2, ir = r - thick, cx = r, cy = r, ang = -Math.PI/2, out = "";
   if (t <= 0) {
-    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'">'+
+    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" aria-hidden="true">'+
       '<circle cx="'+cx+'" cy="'+cy+'" r="'+(r-thick/2)+'" fill="none" stroke="#EFE8E0" stroke-width="'+thick+'"/></svg>';
   }
   var conValor = vals.filter(function(s){ return s.v > 0; });
   if (conValor.length === 1) {
     var u = conValor[0];
-    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" role="img">'+DEFS+
+    return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" role="img" aria-label="'+esc(etiquetaTorta(nombre, vals))+'">'+DEFS+
       '<circle cx="'+cx+'" cy="'+cy+'" r="'+(r-thick/2)+'" fill="none" stroke="'+u.col+
       '" stroke-width="'+thick+'"><title>'+esc(u.lab)+': '+gsM(u.v)+' (100%)</title></circle></svg>';
   }
@@ -850,7 +944,7 @@ function donut(vals, size, thick){
       '<title>'+esc(s.lab)+': '+gsM(s.v)+' ('+pct(s.v,t)+')</title></path>';
     ang = a2;
   });
-  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" role="img">'+DEFS+out+'</svg>';
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 '+size+' '+size+'" role="img" aria-label="'+esc(etiquetaTorta(nombre, vals))+'">'+DEFS+out+'</svg>';
 }
 function swatch(c){
   return c.k === "NC"
@@ -996,11 +1090,14 @@ function armarFiltros(){
     reflejarFiltros();
     pintar(); sincronizarSerie();
     irA(0);
-    window.scrollTo({ top:0, behavior:"smooth" });
+    window.scrollTo({ top:0, behavior:MOV });
   }
 
   document.getElementById("ir-inicio").addEventListener("click", reiniciar);
   document.getElementById("mini-logo").addEventListener("click", reiniciar);
+  document.getElementById("mini-logo").addEventListener("keydown", function(e){
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); reiniciar(); }
+  });
   document.getElementById("ir-inicio").addEventListener("keydown", function(e){
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); reiniciar(); }
   });
@@ -1135,17 +1232,20 @@ function armarFiltros(){
 
   /* Secciones plegables. */
   Array.prototype.forEach.call(document.querySelectorAll("section .shead"), function(h){
-    if (!h.querySelector(".caret")) h.insertAdjacentHTML("afterbegin", '<span class="caret">▾</span>');
-    h.setAttribute("role", "button");
-    h.setAttribute("tabindex", "0");
+    /* El título queda como título (h2) y el botón va adentro: con todo el
+       encabezado como role="button", un lector de pantalla dejaba de
+       anunciar las secciones como títulos. */
+    var btn = botonDentro(h.querySelector("h2"));
+    if (btn && !btn.querySelector(".caret")) {
+      btn.insertAdjacentHTML("afterbegin", '<span class="caret" aria-hidden="true">▾</span>');
+      btn.setAttribute("aria-expanded", "true");
+    }
     var alternar = function(){
       h.closest("section").classList.toggle("plegada");
       h.classList.toggle("closed");
+      if (btn) btn.setAttribute("aria-expanded", String(!h.classList.contains("closed")));
     };
     h.addEventListener("click", alternar);
-    h.addEventListener("keydown", function(e){
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); alternar(); }
-    });
   });
 
   /* Señal de que el archivo publicado es de otra versión del script: sin
@@ -1207,6 +1307,12 @@ function guardarEstado(){
     if (el && el.value) e[x[1]] = el.value;
   });
 
+  if (per.desde !== 0 || per.hasta !== MESES.length - 1) { e.pd = per.desde; e.ph = per.hasta; }
+  if (comparando) e.cmp = "1";
+  var ord = Object.keys(orden).filter(function(k){ return JSON.stringify(orden[k]) !== ORDEN_INICIAL[k]; })
+    .map(function(k){ return k + "." + orden[k].k + "." + (orden[k].asc ? 1 : 0); });
+  if (ord.length) e.o = ord.join("~");
+
   var h = Object.keys(e).map(function(k){ return k + "=" + encodeURIComponent(e[k]); }).join("&");
   try {
     history.replaceState(null, "", h ? "#" + h : location.pathname + location.search);
@@ -1234,6 +1340,25 @@ function restaurarEstado(){
   [["q-art","qa"],["q-rot-art","qr"],["q-dep","qd"]].forEach(function(x){
     var el = document.getElementById(x[0]);
     if (el && e[x[1]]) el.value = e[x[1]];
+  });
+  if (e.pd !== undefined && e.ph !== undefined) {
+    var d0 = parseInt(e.pd, 10), h0 = parseInt(e.ph, 10);
+    if (d0 >= 0 && h0 < MESES.length && d0 <= h0) {
+      per.desde = d0; per.hasta = h0;
+      document.getElementById("f-desde").value = d0;
+      document.getElementById("f-hasta").value = h0;
+    }
+  }
+  if (e.cmp === "1") {
+    comparando = true;
+    document.getElementById("f-comparar").setAttribute("aria-pressed", "true");
+    document.getElementById("f-serie").disabled = true;
+  }
+  if (e.o) e.o.split("~").forEach(function(p){
+    var x = p.split(".");
+    if (x.length < 3 || !orden[x[0]]) return;
+    orden[x[0]].k = (x[1] !== "" && !isNaN(x[1])) ? Number(x[1]) : x[1];
+    orden[x[0]].asc = x[2] === "1";
   });
   restaurando = false;
   return e.p === "2";
@@ -1305,7 +1430,7 @@ function pintar(){
         "warn", "NC",
         "Qué parte del stock ya tiene categoría A, B, C o N cargada en Odoo, medida sobre el " +
         "valor. <b>N</b> (producto nuevo) cuenta como clasificado: es una decisión tomada. " +
-        "Lo que figura como \"Sin categoria\" o en blanco, no. Abajo, la misma cuenta por " +
+        "Lo que figura como “Sin categoria” o en blanco, no. Abajo, la misma cuenta por " +
         "cantidad de productos con stock."),
     kpi("Capital en Categoría C", gsM(t.C),
         pct(t.C, T) + " del stock · liquidación pendiente", "", "C",
@@ -1325,9 +1450,6 @@ function pintar(){
     el.addEventListener("click", function(e){
       if (e.target.closest(".ayuda")) return;
       ir(Boolean(e.target.closest(".ver")));
-    });
-    el.addEventListener("keydown", function(e){
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ir(false); }
     });
   });
 
@@ -1381,15 +1503,15 @@ function kpi(lab,val,sub,cls,filtro,porque){
   var id = "ayuda-" + lab.replace(/\W/g,"");
   var clic = filtro !== null && filtro !== undefined;
   return '<div class="kpi '+(clic ? "click " : "")+cls+'"'+
-    (clic ? ' data-filtro="'+esc(filtro)+'" tabindex="0" role="button"' : '')+'>'+
+    (clic ? ' data-filtro="'+esc(filtro)+'"' : '')+'>'+
     '<span>'+lab+
-      '<button class="ayuda" type="button" aria-expanded="false" aria-controls="'+id+'" '+
+      '<button class="ayuda" type="button" aria-label="Qué significa '+esc(lab)+'" aria-expanded="false" aria-controls="'+id+'" '+
       'onclick="event.stopPropagation();var p=document.getElementById(\''+id+'\');'+
       'var v=p.hasAttribute(\'hidden\');v?p.removeAttribute(\'hidden\'):p.setAttribute(\'hidden\',\'\');'+
       'this.setAttribute(\'aria-expanded\',v)">?</button>'+
     '</span>'+
     '<strong>'+val+'</strong><em>'+esc(sub)+'</em>'+
-    (clic && filtro !== "todo" ? '<span class="ver">ver artículos →</span>' : '')+
+    (clic && filtro !== "todo" ? '<button type="button" class="ver">ver artículos →</button>' : '')+
     '<p class="formula" id="'+id+'" hidden style="margin-top:9px">'+porque+'</p></div>';
 }
 
@@ -1398,7 +1520,8 @@ function abrirSeccion(idDentro){
   var sec = document.getElementById(idDentro).closest("section");
   sec.classList.remove("plegada");
   sec.querySelector(".shead").classList.remove("closed");
-  sec.scrollIntoView({ behavior:"smooth", block:"start" });
+  var bs = sec.querySelector(".shead .btn-cel"); if (bs) bs.setAttribute("aria-expanded", "true");
+  sec.scrollIntoView({ behavior:MOV, block:"start" });
 }
 function etiquetaFiltro(){
   var p = [];
@@ -1568,6 +1691,7 @@ function tablaDepositos(T){
   tf.innerHTML = '<tr><td>Total</td>'+celdasResumen(total, T)+'</tr>';
 
   Array.prototype.forEach.call(tb.querySelectorAll("tr[data-dep]"), function(tr){
+    botonDentro(tr.cells[0], null, filaElegida(tr));
     tr.addEventListener("click", function(){
       var elegido = f.dep !== tr.dataset.dep;
       f.dep = elegido ? tr.dataset.dep : "*";
@@ -1577,6 +1701,7 @@ function tablaDepositos(T){
     });
   });
   Array.prototype.forEach.call(tb.querySelectorAll("tr[data-grp]"), function(tr){
+    botonDentro(tr.cells[0], null, filaElegida(tr));
     tr.addEventListener("click", function(){
       f.grp = (f.grp === tr.dataset.grp) ? "*" : tr.dataset.grp;
       if (f.dep !== "*" && f.grp !== "*" && grupoDe(f.dep) !== f.grp) f.dep = "*";
@@ -1829,6 +1954,7 @@ function tablaFamilias(T){
   tf.innerHTML = '<tr><td>Total</td>'+CLAVES.map(function(k){ return celda(s[k], k); }).join('')+
     '<td class="num">'+fmtQ(s.q)+'</td><td class="num">'+fmtM(T)+'</td><td class="num">100%</td><td></td></tr>';
   Array.prototype.forEach.call(tb.querySelectorAll("tr[data-fam]"), function(tr){
+    botonDentro(tr.cells[0], null, filaElegida(tr));
     tr.addEventListener("click", function(){
       f.fam = (f.fam === tr.dataset.fam) ? "*" : tr.dataset.fam;
       registrar("fam");
@@ -1836,6 +1962,7 @@ function tablaFamilias(T){
     });
   });
   Array.prototype.forEach.call(tb.querySelectorAll("tr[data-lin]"), function(tr){
+    botonDentro(tr.cells[0], null, filaElegida(tr));
     tr.addEventListener("click", function(){
       f.lin = (f.lin === tr.dataset.lin) ? "*" : tr.dataset.lin;
       if (f.fam !== "*" && f.lin !== "*" && lineaDe(f.fam) !== f.lin) f.fam = "*";
@@ -1862,7 +1989,7 @@ function pintarAvisoCategoria(filas){
   var caja = document.getElementById("aviso-cat");
   var textos = {
     NC: '<b>Sin categorizar</b> quiere decir que el producto todavía no tiene asignada una ' +
-        'categoría A, B, C o N en Odoo: figura como "Sin categoria" o en blanco. Es el pendiente ' +
+        'categoría A, B, C o N en Odoo: figura como “Sin categoria” o en blanco. Es el pendiente ' +
         'de la matriz, no un dato que falte del artículo.',
     C: '<b>Categoría C</b> es la mercadería marcada para liquidar según la matriz vigente. ' +
        'Es capital inmovilizado que conviene liberar.',
@@ -1957,21 +2084,19 @@ function tortas(filas){
     var mini = CATS.filter(function(c){ return r[c.k] > 0; }).map(function(c){
       return '<b style="background:'+(c.k==="NC" ? "var(--NC-txt)" : c.k==="B" ? "var(--B-txt)" : c.col)+'">'+c.k+' '+Math.round(r[c.k]/T*100)+'</b>';
     }).join("");
-    return '<div class="pie'+(f.fam === r.k ? " on" : "")+'" data-fam="'+esc(r.k)+'" tabindex="0" role="button">'+
-      '<h4>'+esc(r.k)+'</h4><div class="tot">'+gsM(T)+'</div>'+
-      donut(valores(r),116,24)+'<div class="mini">'+mini+'</div></div>';
+    return '<div class="pie'+(f.fam === r.k ? " on" : "")+'" data-fam="'+esc(r.k)+'">'+
+      '<h3>'+esc(r.k)+'</h3><div class="tot">'+gsM(T)+'</div>'+
+      donut(valores(r),116,24,r.k)+'<div class="mini">'+mini+'</div></div>';
   }).join("");
 
   Array.prototype.forEach.call(document.querySelectorAll("#pies .pie"), function(el){
+    botonDentro(el.querySelector("h3"), null, el.classList.contains("on"));
     var elegir = function(){
       f.fam = (f.fam === el.dataset.fam) ? "*" : el.dataset.fam;
       registrar("fam");
       reflejarFiltros(); pintar(); sincronizarSerie();
     };
     el.addEventListener("click", elegir);
-    el.addEventListener("keydown", function(e){
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); elegir(); }
-    });
   });
 }
 
@@ -2175,12 +2300,12 @@ function evolucionComparada(){
     ejeY(tope, W, P, Y) + lineas + etiquetas + '</svg>' +
     '<div class="leyenda-serie">' + series.map(function(x){
       var ult = x.d[x.d.length-1];
-      return '<span data-serie="'+esc(x.nombre)+'" title="Ver solo esta"><i style="background:'+x.col+'"></i>'+
-        esc(x.nombre)+' <b class="mono" style="font-weight:500">'+fmtM(ult)+'</b></span>';
+      return '<button type="button" data-serie="'+esc(x.nombre)+'" title="Ver solo esta"><i style="background:'+x.col+'"></i>'+
+        esc(x.nombre)+' <b class="mono" style="font-weight:500">'+fmtM(ult)+'</b></button>';
     }).join("") + '</div>';
 
   /* Clic en la leyenda: pasa a ver solo esa serie. */
-  Array.prototype.forEach.call(caja.querySelectorAll(".leyenda-serie span"), function(el){
+  Array.prototype.forEach.call(caja.querySelectorAll(".leyenda-serie button"), function(el){
     el.addEventListener("click", function(){
       comparando = false;
       document.getElementById("f-comparar").setAttribute("aria-pressed", "false");
@@ -2329,13 +2454,14 @@ function rotacion(){
 
   /* Clic en la familia: abre el detalle por artículo debajo. */
   Array.prototype.forEach.call(tb.querySelectorAll("tr[data-fam]"), function(tr){
+    botonDentro(tr.cells[0], null, filaElegida(tr));
     tr.addEventListener("click", function(){
       serieActiva = tr.dataset.fam;
       articuloActivo = null;
       document.getElementById("f-serie").value = serieActiva;
       evolucion(); rotacion(); rotacionArticulos(); guardarEstado();
       var sec = document.getElementById("sec-rot-art");
-      if (!sec.hidden) sec.scrollIntoView({ behavior:"smooth", block:"start" });
+      if (!sec.hidden) sec.scrollIntoView({ behavior:MOV, block:"start" });
     });
   });
 }
@@ -2405,6 +2531,14 @@ function armarCabeceraArticulos(){
       if (orden.rota.k === num) orden.rota.asc = !orden.rota.asc;
       else { orden.rota.k = num; orden.rota.asc = false; }
       rotacionArticulos();
+    });
+  });
+  /* Ordenar también con el teclado. */
+  Array.prototype.forEach.call(tr.querySelectorAll("th.ord"), function(th){
+    th.setAttribute("role", "button");
+    th.setAttribute("tabindex", "0");
+    th.addEventListener("keydown", function(e){
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); th.click(); }
     });
   });
 }
@@ -2504,12 +2638,13 @@ function rotacionArticulos(){
   Array.prototype.forEach.call(
     document.querySelectorAll("#tbl-rot-art tbody tr[data-clave]"), function(tr){
       if (!SERIES_ART[tr.dataset.clave]) return;
+      botonDentro(tr.cells[1], "Ver su histórico", tr.dataset.clave === articuloActivo);
       tr.addEventListener("click", function(){
         articuloActivo = (articuloActivo === tr.dataset.clave) ? null : tr.dataset.clave;
         document.getElementById("volver-familia").hidden = !articuloActivo;
         evolucion(); rotacionArticulos(); guardarEstado();
         document.getElementById("evo-chart").closest("section")
-          .scrollIntoView({ behavior:"smooth", block:"start" });
+          .scrollIntoView({ behavior:MOV, block:"start" });
       });
     });
 }
@@ -2518,12 +2653,45 @@ function rotacionArticulos(){
 var tabs = [document.getElementById("t1"), document.getElementById("t2")];
 var panes = [document.getElementById("p1"), document.getElementById("p2")];
 function irA(i){
-  tabs.forEach(function(x,j){ x.setAttribute("aria-selected", j===i); });
+  tabs.forEach(function(x,j){ x.setAttribute("aria-selected", j===i); x.tabIndex = (j===i) ? 0 : -1; });
   panes.forEach(function(p,j){ p.hidden = j!==i; });
   guardarEstado();
 }
 tabs.forEach(function(t,i){
-  t.addEventListener("click", function(){ irA(i); window.scrollTo({top:0, behavior:"smooth"}); });
+  t.addEventListener("click", function(){ irA(i); window.scrollTo({top:0, behavior:MOV}); });
+});
+
+/* Pestañas con el teclado: flechas, Inicio y Fin. */
+document.querySelector('[role="tablist"]').addEventListener("keydown", function(e){
+  var i = tabs.indexOf(document.activeElement);
+  if (i < 0) return;
+  var n = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key];
+  if (n === undefined) return;
+  e.preventDefault();
+  n = (n + tabs.length) % tabs.length;
+  irA(n);
+  tabs[n].focus();
+});
+tabs.forEach(function(x){ x.tabIndex = x.getAttribute("aria-selected") === "true" ? 0 : -1; });
+
+/* "Saltar al contenido" sin tocar el hash, que guarda el estado del reporte. */
+(function(){
+  var saltar = document.querySelector(".saltar");
+  if (saltar) saltar.addEventListener("click", function(e){
+    e.preventDefault();
+    var m = document.getElementById("contenido");
+    m.focus({ preventScroll:true });
+    m.scrollIntoView();
+  });
+})();
+
+/* Período, comparación y orden de tablas también quedan en la dirección. */
+["f-desde", "f-hasta"].forEach(function(id){
+  document.getElementById(id).addEventListener("change", function(){ setTimeout(guardarEstado, 0); });
+});
+document.getElementById("f-comparar").addEventListener("click", function(){ setTimeout(guardarEstado, 0); });
+document.addEventListener("click", function(e){
+  if (e.target.closest && e.target.closest("th.ord")) setTimeout(guardarEstado, 0);
 });
 
 armarFiltros();
